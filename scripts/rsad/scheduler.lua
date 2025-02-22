@@ -8,7 +8,7 @@ require("scripts.rsad.rsad-controller")
 function handle_station_request(station)
     if not station then return false, nil, 3 end
     
-    local yard = create_or_get_train_yard(station.network) ---@type TrainYard
+    local yard = get_or_create_train_yard(station.network) ---@type TrainYard
     local request = station.item
     local assigned_train ---@type uint
 

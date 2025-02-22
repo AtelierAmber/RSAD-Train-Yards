@@ -1,4 +1,4 @@
-local rsad_station = flib.copy_prototype(data.raw["constant-combinator"]["constant-combinator"], names.entities.rsad_station)
+local rsad_station = flib.copy_prototype(data.raw["arithmetic-combinator"]["arithmetic-combinator"], names.entities.rsad_station)
 
 rsad_station.icon = "__rsad-train-yards__/graphics/icons/rsad-station.png"
 rsad_station.corpse = "small-remnants"
@@ -8,7 +8,15 @@ rsad_station.minable = {
     mining_time = 0.1,
     result = names.entities.rsad_station
   }
-rsad_station.flags = {"get-by-unit-number"}
+rsad_station.energy_source = {
+    type = "void"
+}
+rsad_station.active_energy_usage = "1kW"
+rsad_station.flags = {
+    "get-by-unit-number",
+    "placeable-neutral",
+    "player-creation"
+}
 
 rsad_station.sprites = {}
 for _, dir in pairs({ "north", "east", "south", "west" }) do
@@ -20,6 +28,8 @@ for _, dir in pairs({ "north", "east", "south", "west" }) do
         scale = 0.5,
     }
 end
+
+rsad_station.type = "arithmetic-combinator"
 
 data.extend({
     rsad_station

@@ -1,3 +1,5 @@
+require("scripts.gui.station-gui")
+
 ---@param event EventData.on_gui_opened
 local function on_gui_opened(event)
 	local entity = event.entity
@@ -31,7 +33,9 @@ local function on_gui_closed(event)
 end
 
 flib_gui.add_handlers({
-	["rsad-station-close"] = handle_close
+	["rsad-station-close"] = handle_close,
+	["rsad-station-type"] = handle_type_drop_down,
+	["rsad-station-network"] = handle_network
 })
 flib_gui.handle_events()
 
