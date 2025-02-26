@@ -199,17 +199,17 @@ function events.register_break(kind, name, func)
 end
 
 ---@param func fun()
-function register_init(func)
+function events.register_init(func)
     init_registrar[#init_registrar+1] = func
 end
 
 ---@param func fun()
-function register_load(func)
+function events.register_load(func)
     load_registrar[#load_registrar+1] = func
 end
 
 ---@param func fun(entity:LuaEntity)
-function register_paste(func)
+function events.register_paste(func)
     paste_registrar[#paste_registrar+1] = func
 end
 

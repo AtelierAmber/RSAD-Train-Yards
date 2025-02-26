@@ -26,7 +26,7 @@ function handle_station_request(controller, station)
 end
 
 function scheduler.tick(self)
-
+    return false
 end
 
 return scheduler

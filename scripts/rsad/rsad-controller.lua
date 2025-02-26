@@ -3,7 +3,7 @@ require("scripts.rsad.station")
 scheduler = require("scripts.rsad.scheduler")
 require("scripts.util.events")
 
-ticks_per_update = 360/settings.startup["rsad-station-update-rate"] --[[@as int]]
+ticks_per_update = 360/settings.startup["rsad-station-update-rate"].value --[[@as int]]
 
 ---@type string?
 active_yard = nil
@@ -17,11 +17,13 @@ rsad_controller = {
     scheduler = scheduler
 }
 
+---@param self rsad_controller
 function rsad_controller.__init(self)
     --storage.stations = {}
     --storage.shunter_trains = {} --[[@type table<string, table<uint, ShuntingData>>}]]
 end
 
+---@param self rsad_controller
 function rsad_controller.__load(self)
     if storage.shunter_trains then
         for network, trains in pairs(storage.shunter_trains) do
@@ -30,20 +32,29 @@ function rsad_controller.__load(self)
     end
 end
 
-function rsad_controller.__tick(self)
+---@param self rsad_controller
+---@param tick_data NthTickEventData
+function rsad_controller.__tick(self, tick_data)
     --- Check first if any shunting orders need to be issued
     if self.scheduler:tick() then end
+
     ---@type TrainYard?
     local yard
     ---@type string?
     local k
----@diagnostic disable-next-line: unbalanced-assignments
-    k, yard = next(self.train_yards, active_yard) or next(self.train_yards)
-    active_yard = k
-    if not active_yard or not yard then return end
-    yard:tick()
+    while active_yard ~= nil do
+        yard = self.train_yards[active_yard]
+        if yard then
+            if yard:tick() then break end
+        end
+        ---@diagnostic disable-next-line: unbalanced-assignments
+        k, yard = next(self.train_yards, active_yard)
+        active_yard = k
+    end
+    if not active_yard then active_yard = next(self.train_yards, active_yard) end
 end
 
+---@param self rsad_controller
 ---@param entity LuaEntity
 ---@return boolean
 function rsad_controller.__on_station_destroyed(self, entity)
@@ -57,6 +68,7 @@ function rsad_controller.__on_station_destroyed(self, entity)
     return true
 end
 
+---@param self rsad_controller
 ---@param entity LuaEntity
 ---@return boolean
 function rsad_controller.__on_station_built(self, entity)
@@ -88,14 +100,17 @@ function rsad_controller.__on_paste_settings(self, entity)
     end
 end
 
+---@param self rsad_controller
 function rsad_controller.register_events(self)
    events.register_init(function() self:__init() end)
    events.register_load(function() self:__load() end)
    events.register_break("name", names.entities.rsad_station, function(entity) return self:__on_station_destroyed(entity) end)
    events.register_build("name", names.entities.rsad_station, function(entity) return self:__on_station_built(entity) end)
    events.register_paste(function(entity) self:__on_paste_settings(entity) end )
+   script.on_nth_tick(ticks_per_update, function(tick_data) self:__tick(tick_data) end)
 end
 
+---@param self rsad_controller
 ---@param signal SignalID
 ---@return TrainYard?
 function rsad_controller.get_train_yard_or_nil(self, signal)
@@ -104,6 +119,7 @@ function rsad_controller.get_train_yard_or_nil(self, signal)
 end
 
 ---Get or creates a train yard with specified signal
+---@param self rsad_controller
 ---@param signal SignalID
 ---@return TrainYard? yard
 function rsad_controller.get_or_create_train_yard(self, signal)
@@ -114,6 +130,7 @@ function rsad_controller.get_or_create_train_yard(self, signal)
 end
 
 ---Returns false if needed to create, true if it was found
+---@param self rsad_controller
 ---@param entity LuaEntity
 ---@param network SignalID?
 ---@return boolean, RSADStation? 
@@ -129,6 +146,7 @@ function rsad_controller.get_or_create_station(self, entity, network)
 end
 
 --- Creates station and assignes it to a train yard
+---@param self rsad_controller
 ---@param entity LuaEntity
 ---@param network SignalID
 ---@return RSADStation?
@@ -150,6 +168,7 @@ function rsad_controller.construct_station(self, entity, network)
 end
 
 ---comment
+---@param self rsad_controller
 ---@param station RSADStation
 function rsad_controller.decommision_station_from_yard(self, station)
     if not station then return end
@@ -175,6 +194,7 @@ function rsad_controller.decommision_station_from_yard(self, station)
 end
 
 ---comment
+---@param self rsad_controller
 ---@param station RSADStation
 ---@param new_network SignalID
 ---@return boolean

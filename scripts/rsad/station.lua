@@ -8,6 +8,7 @@ require("scripts.rsad.util")
 ---@field public subtype uint?
 
 ---@see create_rsad_station
+---
 ---@class RSADStation
 ---@field public unit_number uint
 ---@field public assignements uint -- Number of assigned trains to this station
@@ -81,7 +82,7 @@ function update_station_data(station, new_data)
     control.circuit_condition = circuit
 
     update_rsad_station_name(station_entity, control, type)
-    
+
     return true
 end
 
