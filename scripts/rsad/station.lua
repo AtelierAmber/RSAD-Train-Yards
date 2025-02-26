@@ -1,8 +1,5 @@
 require("scripts.defines")
 
-local translation_id = nil
-local translated_entity = nil
-
 ---@class StationData
 ---@field public type rsad_station_type?
 ---@field public network SignalID?
@@ -12,65 +9,47 @@ local translated_entity = nil
 ---@see create_rsad_station
 ---@class RSADStation
 ---@field public unit_number uint
+---@field public assignements uint -- Number of assigned trains to this station
+
 ---                                    success  data        
----@field public data fun(self: self): boolean, StationData?
----                                                         success
----@field public update fun(self: self, new_data: StationData): boolean
----
----@field public decommision fun(self: self)
+-- ---@field public data fun(self: self): boolean, StationData?
+-- ---                                                         success
+-- ---@field public update fun(self: self, new_data: StationData): boolean
+-- ---
+-- ---@field public decommision fun(self: self)
 
----@param info_string string
----@return uint subtype
-local function unpack_station_info(info_string)
+---@param constant int
+---@return uint type, uint subtype
+local function unpack_station_constant(constant)
     --- Layout: Station Type | Station Network | Station Item | packed_bytes_as(subtype)
-    local packed_end, packed_start = info_string:find("|", -1, true)
-    if not packed_end or not packed_start then return 0 end
-
-    local packed_info = info_string:sub(packed_start, packed_end)
-    local subtype = packed_info:byte(1)
-
-    return subtype
+    local type = bit32.extract(constant, 0, 4) -- 0000 1111
+    local subtype = bit32.extract(constant, 4, 4) -- 1111 0000
+    return type, subtype
 end
 
 ---@param type rsad_station_type|string
----@param network SignalID|string
----@param item SignalID|string
 ---@param subtype uint
----@return string, LocalisedString
-local function pack_station_info(type, network, item, subtype)
-    ---                 Layout: Station Type | Station Network | Station Item | packed_bytes_as(subtype)
-    local description = "station-" .. type --[[@as string]] .. " | " .. network.name or network .. " | " .. item.name or item .. " | "
-    local packed_info = string.char(subtype)
-    return description .. packed_info,
-     {"", {"station-" .. type --[[@as string]] .. " | "}, {network.name or network .. " | "}, {item.name or item .. " | "}, packed_info}
-end
-
----@param event EventData.on_string_translated
-local function on_translate_description(event)
-    if not translated_entity or not translation_id then 
-        script.on_event(defines.events.on_string_translated, nil)
-        return
-    end
-    if event.id == translation_id and event.translated then
-        script.on_event(defines.events.on_string_translated, nil)
-        translated_entity.combinator_description = event.localised_string
-    end
+---@return uint
+local function pack_station_constant(type, subtype)
+    return bit32.bor(type, bit32.lshift(subtype, 4))
 end
 
 ---@param station RSADStation
 ---@return boolean success, StationData? data
-local function get_station_data(station)
+function get_station_data(station)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
     if not station_entity then return false end
 
-    local control = station_entity.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
-    local param = control.parameters
+    local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+
+---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.53
+    local type, subtype = unpack_station_constant(control.circuit_condition.constant)
 
     local data = {
-        type = param.operation --[[@as rsad_station_type]],
-        network = param.first_signal,
-        item = param.second_signal,
-        subtype = unpack_station_info(station_entity.combinator_description)
+        type = type --[[@as rsad_station_type]],
+        network = control.stopped_train_signal,
+        item = control.priority_signal,
+        subtype = subtype
     } --[[@type StationData]]
 
     return true, data
@@ -79,55 +58,52 @@ end
 ---@param station RSADStation
 ---@param new_data StationData
 ---@return boolean success
-local function update_station_data(station, new_data)
+function update_station_data(station, new_data)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
     if not station_entity then return false end
 
-    local control = station_entity.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
-    local params = control.parameters
-    local type, network, item = new_data.type or params.operation, new_data.network or params.first_signal, new_data.item or params.second_signal
+    local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
+    local old_type, old_subtype = unpack_station_constant(control.circuit_condition.constant or 1)
+    local type, network, item, subtype = new_data.type or old_type, new_data.network or control.stopped_train_signal, new_data.item or control.priority_signal, new_data.subtype or old_subtype
 
-    local needs_unpacked_update = type ~= params.operation or network ~= params.first_signal or item ~= params.second_signal
+    local needs_update = type ~= old_type or network ~= control.stopped_train_signal or item ~= control.priority_signal or subtype ~= old_subtype
 
-    if not needs_unpacked_update and not new_data.subtype then return true end
+    if not needs_update then return true end
 
-    if type then
-        ---@cast type string
-        params.operation = type
-    end
-    if network then
-        params.first_signal = network
-    end
-    if item then
-        params.second_signal = item
-    end
+    control.stopped_train_signal = network
+    control.priority_signal = item
 
-    local old_subtype = unpack_station_info(station_entity.combinator_description)
-    local subtype = new_data.subtype or old_subtype
-    if subtype == old_subtype and not needs_unpacked_update then return true end
-    station_entity.combinator_description, localised_description = pack_station_info(type or "Not Assigned", network or "Not Connected", item or "No Item", subtype or 0)
-    if game.player then
-        translation_id = game.player.request_translation(localised_description)
-        if translation_id then
-            translated_entity = station_entity
-            script.on_event(defines.events.on_string_translated, on_translate_description)
-        end
-    end
+    local circuit = control.circuit_condition
+    ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    circuit.constant = pack_station_constant(type, subtype)
+    control.circuit_condition = circuit
 
-    control.parameters = params
+    update_station_name(station_entity, control, type)
+
+    -- local network_name = "Unassigned"
+    -- if control.stopped_train_signal and control.stopped_train_signal.name then
+    --     network_name = (control.stopped_train_signal.type or "item")
+    --     if network_name == "virtual" then
+    --         network_name = network_name .. "-signal"
+    --     end
+    --     network_name = network_name .. "=" .. control.stopped_train_signal.name
+    -- end
+    -- local item_name = ""
+    -- if control.priority_signal and (type == rsad_station_type.import or type == rsad_station_type.request) then 
+    --     item_name = "[" .. (("item=" .. control.priority_signal.name) or "No Item") .. "]"
+    -- end
+    -- station_entity.backer_name = "RSAD Controlled | [" .. network_name .. "] " .. rsad_station_name[type] .. item_name
+
     return true
 end
 
-local function decommision(station)
+function decommision_station(station)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
     if not station_entity then return false end
 
-    local control = station_entity.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
-    local params = control.parameters
-
-    params.first_signal = nil
-
-    control.parameters = params
+    local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    control.stopped_train_signal = nil
 end
 
 ---Creates a new RSADStation object
@@ -136,10 +112,9 @@ end
 function create_rsad_station(entity)
     local station = {
         unit_number = entity.unit_number,
-        data = get_station_data,
-        update = update_station_data,
-        decommision = decommision
+        assignments = 0
     } --[[@type RSADStation]]
     
+
     return station
 end

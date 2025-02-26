@@ -18,6 +18,7 @@ STATUS_SPRITES[defines.entity_status.marked_for_deconstruction] = RED
 local STATUS_SPRITES_DEFAULT = RED
 local STATUS_SPRITES_GHOST = YELLOW
 
+
 local gui_ref
 
 ---@param e EventData.on_gui_click
@@ -40,6 +41,38 @@ function handle_close(e)
 	end
 end
 
+---@param selected_type rsad_station_type
+function set_modal_visibility(selected_type)
+    if selected_type == rsad_station_type.turnabout then
+        --- Hide item signal
+        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+
+    elseif selected_type == rsad_station_type.shunting_depot then
+        --- Hide item signal
+        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        
+    elseif selected_type == rsad_station_type.request then
+        --- Show item signal
+        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = true
+        
+    elseif selected_type == rsad_station_type.import_staging then
+        --- Hide item signal
+        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        
+    elseif selected_type == rsad_station_type.import then
+        --- Show item signal
+        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = true
+    elseif selected_type == rsad_station_type.empty_staging then
+        --- Hide item signal
+        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        
+    elseif selected_type == rsad_station_type.empty_pickup then
+        --- Hide item signal
+        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        
+    end
+end
+
 ---@param e EventData.on_gui_selection_state_changed
 function handle_type_drop_down(e)
 	local element = e.element
@@ -49,23 +82,30 @@ function handle_type_drop_down(e)
 	local entity = game.get_entity_by_unit_number(unit_number)
 	if not entity or not entity.valid then return end
 
-    local station = rsad_controller.stations[unit_number]
-    local control = entity.get_or_create_control_behavior() --[[@as LuaArithmeticCombinatorControlBehavior]]
-    local params = control.parameters
-    params.operation = rsad_index_station[element.selected_index]
-    control.parameters = params
-    gui_ref.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. rsad_index_station[element.selected_index]}, " Station"}
-    if station then
-        local success, data = station:data()
-        if not success or not data then return end
+    local index = element.selected_index - 1
 
-        local yard = get_or_create_train_yard(data.network)
+    local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    local circuit = control.circuit_condition
+    ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    circuit.constant = bit32.replace(circuit.constant, index, 0, 4)
+    control.circuit_condition = circuit
+
+    local station = rsad_controller.stations[unit_number]
+    if station and entity.name ~= "entity-ghost" then
+
+        local yard = get_or_create_train_yard(control.stopped_train_signal)
         if yard then
             yard:add_or_update_station(station)
         end
     end
-	--set_visibility(element.parent.parent.parent.parent, element.selected_index)
+
+    update_station_name(entity, control, index)
+
+    gui_ref.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. index}, " Station"}
+
+	set_modal_visibility(index)
 end
+
 
 ---@param e EventData.on_gui_elem_changed
 function handle_network(e)
@@ -75,8 +115,8 @@ function handle_network(e)
 	local entity = game.get_entity_by_unit_number(unit_number)
 	if not entity or not entity.valid then return end
 
-	local signal = element.elem_value --[[@as SignalID]]
-    if signal then
+	local signal = element.elem_value --[[@as SignalID?]]
+    if signal and entity.name ~= "entity-ghost" then
         local found, station = get_or_create_station(entity, signal)
         if found and station then
             migrate_station(station, signal)
@@ -84,11 +124,39 @@ function handle_network(e)
     end
 end
 
+---@param e EventData.on_gui_elem_changed
+function handle_item(e)
+	local element = e.element
+	if not element then return end
+    local unit_number = element.tags.id --[[@as uint]]
+	local entity = game.get_entity_by_unit_number(unit_number)
+	if not entity or not entity.valid then return end
+
+    if element.elem_value then
+        --[[@type SignalID]]
+        local signal = {}
+        signal.name = element.elem_value --[[@as string]]
+        local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+        control.priority_signal = signal
+        ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
+        update_station_name(entity, control, bit32.extract(control.circuit_condition.constant, 0, 4))
+
+        local station = rsad_controller.stations[unit_number]
+        if station and entity.name ~= "entity-ghost" then            
+            local yard = get_or_create_train_yard(control.stopped_train_signal)
+            if yard then
+                yard:add_or_update_station(station)
+            end
+        end
+    end
+end
+
 ---@param entity LuaEntity
 ---@param player LuaPlayer
 ---@param network SignalID?
+---@param item SignalID?
 ---@return flib.GuiElemDef
-function station_gui(entity, player, selected_index, network) return {
+function station_gui(entity, player, selected_index, network, item) return {
     type = "frame",
     direction = "vertical",
     name = names.gui.rsad_station,
@@ -101,7 +169,7 @@ function station_gui(entity, player, selected_index, network) return {
                     type = "label",
                     style = "frame_title",
                     name = "titlebar_label",
-                    caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. rsad_index_station[selected_index]}, " Station"},
+                    caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. selected_index}, " Station"},
                     elem_mods = { ignored_by_interaction = true },
                 },
                 { type = "empty-widget", style = "flib_titlebar_drag_handle", elem_mods = { ignored_by_interaction = true } },
@@ -111,7 +179,7 @@ function station_gui(entity, player, selected_index, network) return {
                     mouse_button_filter = { "left" },
                     sprite = "utility/close",
                     hovered_sprite = "utility/close",
-                    name = names.gui.rsad_station,
+                    name = "close_button",
                     handler = handle_close,
                     tags = { id = entity.unit_number },
                 },
@@ -125,7 +193,7 @@ function station_gui(entity, player, selected_index, network) return {
             style_mods = { padding = 12, bottom_padding = 9 },
             children = {
                 type = "flow",
-                name = "vflow",
+                name = "vflow_main",
                 direction = "vertical",
                 style_mods = { horizontal_align = "left" },
                 children = {
@@ -186,13 +254,13 @@ function station_gui(entity, player, selected_index, network) return {
                                 tags = { id = entity.unit_number },
                                 selected_index = selected_index,
                                 items = {
-                                    { "rsad-gui.station-types.station-*" },
-                                    { "rsad-gui.station-types.station-/" },
-                                    { "rsad-gui.station-types.station-+" },
-                                    { "rsad-gui.station-types.station-<<" },
-                                    { "rsad-gui.station-types.station->>" },
-                                    { "rsad-gui.station-types.station--" },
-                                    { "rsad-gui.station-types.station-^" },
+                                    { "rsad-gui.station-types.station-0" },
+                                    { "rsad-gui.station-types.station-1" },
+                                    { "rsad-gui.station-types.station-2" },
+                                    { "rsad-gui.station-types.station-3" },
+                                    { "rsad-gui.station-types.station-4" },
+                                    { "rsad-gui.station-types.station-5" },
+                                    { "rsad-gui.station-types.station-6" },
                                 },
                             }
                         },
@@ -200,31 +268,84 @@ function station_gui(entity, player, selected_index, network) return {
                     ---Settings section for network
                     { type = "line", style_mods = { top_padding = 10 } },
                     {
-                        type = "label",
-                        name = "network_label",
-                        style = "heading_2_label",
-                        caption = { "rsad-gui.network" },
-                        style_mods = { top_padding = 8 },
-                    },
-                    {
                         type = "flow",
-                        name = "bottom",
+                        name = "hflow_signals",
                         direction = "horizontal",
-                        style_mods = { vertical_align = "top" },
+                        style_mods = {horizontal_align = "center", vertical_align = "center"},
                         children = {
+                            --Network
                             {
-                                type = "choose-elem-button",
-                                name = "network",
-                                style = "slot_button_in_shallow_frame",
-                                elem_type = "signal",
-                                tooltip = { "rsad-gui.network-tooltip" },
-                                signal = network,
-                                style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
-                                handler = handle_network,
-                                tags = { id = entity.unit_number },
+                                type = "flow",
+                                name = "vflow_network",
+                                direction = "vertical",
+                                style_mods = {horizontal_align = "center"},
+                                children = {
+                                    {
+                                        type = "label",
+                                        name = "network_label",
+                                        style = "heading_2_label",
+                                        caption = { "rsad-gui.network" },
+                                        style_mods = { top_padding = 8 },
+                                    },
+                                    {
+                                        type = "flow",
+                                        name = "bottom",
+                                        direction = "horizontal",
+                                        style_mods = { vertical_align = "top" },
+                                        children = {
+                                            {
+                                                type = "choose-elem-button",
+                                                name = "network",
+                                                style = "slot_button_in_shallow_frame",
+                                                elem_type = "signal",
+                                                tooltip = { "rsad-gui.network-tooltip" },
+                                                signal = network,
+                                                style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                                                handler = handle_network,
+                                                tags = { id = entity.unit_number },
+                                            },
+                                        },
+                                    }
+                                }
                             },
-                        },
-                    },
+                            { type = "line", direction = "vertical", style_mods = { top_padding = 10 } },
+                            --Item
+                            {
+                                type = "flow",
+                                name = "vflow_item",
+                                direction = "vertical",
+                                style_mods = {horizontal_align = "center"},
+                                children = {
+                                    {
+                                        type = "label",
+                                        name = "item_label",
+                                        style = "heading_2_label",
+                                        caption = { "rsad-gui.item" },
+                                        style_mods = { top_padding = 8 },
+                                    },
+                                    {
+                                        type = "flow",
+                                        name = "bottom",
+                                        direction = "horizontal",
+                                        style_mods = { vertical_align = "top" },
+                                        children = {
+                                            {
+                                                type = "choose-elem-button",
+                                                name = "item",
+                                                style = "slot_button_in_shallow_frame",
+                                                elem_type = "item",
+                                                tooltip = { "rsad-gui.item-tooltip" },
+                                                item = (item and item.name),
+                                                style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                                                handler = handle_item,
+                                                tags = { id = entity.unit_number },
+                                            },
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -232,21 +353,27 @@ function station_gui(entity, player, selected_index, network) return {
 } end
 
 ---@param entity LuaEntity
----@return uint selected_type, SignalID? network, uint 
+---@return uint selected_type, SignalID? network, SignalID? item, uint 
 function get_station_gui_settings(entity)
-    local params = entity.get_or_create_control_behavior().parameters --[[@as ArithmeticCombinatorParameters]]
-	return rsad_station_index[params.operation], params.first_signal, 0
+    local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
+    local type = bit32.extract(control.circuit_condition.constant, 0, 4)
+    ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
+    local subtype = bit32.extract(control.circuit_condition.constant, 4, 4)
+	return  type + 1, control.stopped_train_signal, control.priority_signal, 0
 end
 
 function open_station_gui(rootgui, entity, player)
-    local selected_type, network, subtype = get_station_gui_settings(entity)
-    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network)})
+    local selected_type, network, item, subtype = get_station_gui_settings(entity)
+    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item)})
     gui_ref = mainscreen
-    gui_ref.frame.vflow.preview_frame.preview.entity = entity
+    gui_ref.frame.vflow_main.preview_frame.preview.entity = entity
     gui_ref.titlebar.drag_target = gui_ref
+    gui_ref.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. (selected_type-1)}, " Station"}
     gui_ref.force_auto_center()
 
     gui_ref.tags = {unit_number = entity.unit_number}
+    set_modal_visibility(selected_type-1)
     player.opened = gui_ref
 end
 

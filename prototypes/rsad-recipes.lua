@@ -1,4 +1,4 @@
-local rsad_station_recipe = flib.copy_prototype(data.raw["recipe"]["constant-combinator"], names.entities.rsad_station)
+local rsad_station_recipe = flib.copy_prototype(data.raw["recipe"]["train-stop"], names.entities.rsad_station)
 
 rsad_station_recipe.enabled = false
 rsad_station_recipe.subgroup = data.raw["recipe"]["train-stop"].subgroup

@@ -1,2 +1,2 @@
 require("scripts.rsad.rsad-controller")
-require("scripts.rsad.events")
+rsad_controller.register_events()

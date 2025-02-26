@@ -35,7 +35,8 @@ end
 flib_gui.add_handlers({
 	["rsad-station-close"] = handle_close,
 	["rsad-station-type"] = handle_type_drop_down,
-	["rsad-station-network"] = handle_network
+	["rsad-station-network"] = handle_network,
+	["rsad-station-item"] = handle_item
 })
 flib_gui.handle_events()
 
