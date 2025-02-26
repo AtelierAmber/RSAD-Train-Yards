@@ -23,6 +23,7 @@ local next = next -- Assign local table next for indexing speed
 ---@field public remove_station fun(self: self, station: RSADStation) --- Removes the station from yard
 ---@field public is_empty fun(self: self): boolean --- Returns true if no stations exist in this yard
 ---@field public decommision fun(self: self) --- Returns true if no stations exist in this yard
+---@field public tick fun(self: self)
 
 --- TODO: Make custom schedules possible
 
@@ -107,12 +108,13 @@ function create_train_yard(network)
         add_or_update_station = add_or_update_station,
         remove_station = remove_station,
         is_empty = is_empty,
-        decommision = decommision_yard
+        decommision = decommision_yard,
+        tick = tick
     }
     --[[@type TrainYard]]
     return yard
 end
 
-function on_tick()
+function tick()
     -- TODO Check for empty cargo and send requests
 end

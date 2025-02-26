@@ -11,6 +11,8 @@ local load_registrar = {}
 local build_filter = {}
 local destroy_filter = {}
 
+events = {}
+
 ---@param event EventData.on_built_entity|EventData.on_robot_built_entity|EventData.on_space_platform_built_entity|EventData.script_raised_built|EventData.script_raised_revive|EventData.on_entity_cloned
 local function on_built(event)
 	local entity = event.entity
@@ -141,8 +143,6 @@ local function on_load()
     end
 end
 
-
-
 ---@param event EventData.on_entity_settings_pasted
 local function on_paste(event)
     for _, registry in pairs(paste_registrar) do
@@ -154,7 +154,7 @@ end
 
 ---@param type defines.events.on_train_changed_state | defines.events.on_train_created | defines.events.on_train_schedule_changed
 ---@param func fun(event:EventData.on_train_changed_state|EventData.on_train_created|EventData.on_train_schedule_changed)
-function register_train_handler(type, func)
+function events.register_train_handler(type, func)
     train_registrar[type] = train_registrar[type] or {}
     train_registrar[type][#train_registrar[type]+1] = func
 end
@@ -164,7 +164,7 @@ end
 ---@param kind string
 ---@param name string
 ---@param func fun(entity:LuaEntity):boolean
-function register_build(kind, name, func)
+function events.register_build(kind, name, func)
     build_registrar[kind] = build_registrar[kind] or {}
     local registration = build_registrar[kind][name] or {}
     registration[#registration+1] = func
@@ -183,7 +183,7 @@ end
 ---@param kind string
 ---@param name string
 ---@param func fun(entity:LuaEntity):boolean
-function register_break(kind, name, func)
+function events.register_break(kind, name, func)
     destroy_registrar[kind] = destroy_registrar[kind] or {}
     local registration = destroy_registrar[kind][name] or {}
     registration[#registration+1] = func
@@ -241,7 +241,7 @@ local function register_train_events()
     script.on_event(defines.events.on_train_schedule_changed, on_train_event)
 end
 
-local function init()
+function events.init()
     register_build_events()
     register_destroy_events()
 
@@ -298,5 +298,3 @@ local function init()
 
 	-- register_tick()
 end
-
-init()

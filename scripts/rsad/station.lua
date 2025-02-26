@@ -1,4 +1,5 @@
 require("scripts.defines")
+require("scripts.rsad.util")
 
 ---@class StationData
 ---@field public type rsad_station_type?
@@ -79,22 +80,8 @@ function update_station_data(station, new_data)
     circuit.constant = pack_station_constant(type, subtype)
     control.circuit_condition = circuit
 
-    update_station_name(station_entity, control, type)
-
-    -- local network_name = "Unassigned"
-    -- if control.stopped_train_signal and control.stopped_train_signal.name then
-    --     network_name = (control.stopped_train_signal.type or "item")
-    --     if network_name == "virtual" then
-    --         network_name = network_name .. "-signal"
-    --     end
-    --     network_name = network_name .. "=" .. control.stopped_train_signal.name
-    -- end
-    -- local item_name = ""
-    -- if control.priority_signal and (type == rsad_station_type.import or type == rsad_station_type.request) then 
-    --     item_name = "[" .. (("item=" .. control.priority_signal.name) or "No Item") .. "]"
-    -- end
-    -- station_entity.backer_name = "RSAD Controlled | [" .. network_name .. "] " .. rsad_station_name[type] .. item_name
-
+    update_rsad_station_name(station_entity, control, type)
+    
     return true
 end
 

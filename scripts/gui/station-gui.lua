@@ -1,7 +1,10 @@
+local rsad_controller = rsad_controller --- Find Global rsad_controller
+assert(rsad_controller ~= nil)
+
 flib_gui = require("__flib__.gui")
 require("prototypes.names")
 require("scripts.defines")
-require("scripts.rsad.rsad-controller")
+require("scripts.rsad.util")
 
 local RED = "utility/status_not_working"
 local GREEN = "utility/status_working"
@@ -93,13 +96,13 @@ function handle_type_drop_down(e)
     local station = rsad_controller.stations[unit_number]
     if station and entity.name ~= "entity-ghost" then
 
-        local yard = get_or_create_train_yard(control.stopped_train_signal)
+        local yard = rsad_controller:get_or_create_train_yard(control.stopped_train_signal)
         if yard then
             yard:add_or_update_station(station)
         end
     end
 
-    update_station_name(entity, control, index)
+    update_rsad_station_name(entity, control, index)
 
     gui_ref.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. index}, " Station"}
 
@@ -117,9 +120,9 @@ function handle_network(e)
 
 	local signal = element.elem_value --[[@as SignalID?]]
     if signal and entity.name ~= "entity-ghost" then
-        local found, station = get_or_create_station(entity, signal)
+        local found, station = rsad_controller:get_or_create_station(entity, signal)
         if found and station then
-            migrate_station(station, signal)
+            rsad_controller:migrate_station(station, signal)
         end
     end
 end
@@ -139,11 +142,11 @@ function handle_item(e)
         local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
         control.priority_signal = signal
         ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
-        update_station_name(entity, control, bit32.extract(control.circuit_condition.constant, 0, 4))
+        update_rsad_station_name(entity, control, bit32.extract(control.circuit_condition.constant, 0, 4))
 
         local station = rsad_controller.stations[unit_number]
         if station and entity.name ~= "entity-ghost" then            
-            local yard = get_or_create_train_yard(control.stopped_train_signal)
+            local yard = rsad_controller:get_or_create_train_yard(control.stopped_train_signal)
             if yard then
                 yard:add_or_update_station(station)
             end

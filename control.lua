@@ -1,5 +1,8 @@
 require("prototypes.names")
-require("scripts.rsad.requires")
-require("scripts.gui.requires")
+rsad_controller = require("scripts.rsad.rsad-controller")
+
+require("scripts.gui.events")
+require("scripts.gui.station-gui")
 
 require("scripts.util.events")
+events.init()
