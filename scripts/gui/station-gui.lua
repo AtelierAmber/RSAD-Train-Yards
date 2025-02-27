@@ -154,12 +154,30 @@ function handle_item(e)
     end
 end
 
+---@param e EventData.on_gui_switch_state_changed
+function handle_reversed(e)    
+	local element = e.element
+	if not element then return end
+    local unit_number = element.tags.id --[[@as uint]]
+	local entity = game.get_entity_by_unit_number(unit_number)
+	if not entity or not entity.valid then return end
+
+    local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    local circuit = control.circuit_condition
+    local state_val = element.switch_state == "left" and 0 or 1
+
+---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    circuit.constant = bit32.replace(circuit.constant, state_val, 8, 1)
+    control.circuit_condition = circuit
+end
+
 ---@param entity LuaEntity
 ---@param player LuaPlayer
 ---@param network SignalID?
 ---@param item SignalID?
+---@param reversed boolean
 ---@return flib.GuiElemDef
-function station_gui(entity, player, selected_index, network, item) return {
+function station_gui(entity, player, selected_index, network, item, reversed) return {
     type = "frame",
     direction = "vertical",
     name = names.gui.rsad_station,
@@ -268,6 +286,35 @@ function station_gui(entity, player, selected_index, network, item) return {
                             }
                         },
                     },
+                    ---Reversed Shunting switch
+                    { type = "line", style_mods = { top_padding = 10 } },
+                    {
+                        type = "flow",
+                        name = "vflow_switch",
+                        direction = "vertical",
+                        style_mods = {horizontal_align = "left"},
+                        children = {
+                            {
+                                type = "label",
+                                name = "switch_label",
+                                style = "heading_2_label",
+                                caption = {"rsad-gui.shunting-direction-switch"},
+                                style_mods = {top_padding = 8}
+                            },
+                            {
+                                type = "switch",
+                                name = "shunting_direction_switch",
+                                left_label_caption = {"rsad-gui.shunting-direction-switch-left"},
+                                left_label_tooltip = {"rsad-gui.shunting-direction-switch-left-tooltip"},
+                                right_label_caption = {"rsad-gui.shunting-direction-switch-right"},
+                                right_label_tooltip = {"rsad-gui.shunting-direction-switch-right-tooltip"},
+                                allow_none_state = false,
+                                switch_state = reversed and "right" or "left",
+                                handler = handle_reversed,
+                                tags = { id = entity.unit_number },
+                            }
+                        }
+                    },
                     ---Settings section for network
                     { type = "line", style_mods = { top_padding = 10 } },
                     {
@@ -356,19 +403,20 @@ function station_gui(entity, player, selected_index, network, item) return {
 } end
 
 ---@param entity LuaEntity
----@return uint selected_type, SignalID? network, SignalID? item, uint 
+---@return uint selected_type, SignalID? network, SignalID? item, uint subtype, boolean reversed
 function get_station_gui_settings(entity)
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
----@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
-    local type = bit32.extract(control.circuit_condition.constant, 0, 4)
     ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
-    local subtype = bit32.extract(control.circuit_condition.constant, 4, 4)
-	return  type + 1, control.stopped_train_signal, control.priority_signal, 0
+    local constant = control.circuit_condition.constant
+    local type = bit32.extract(constant, 0, 4)
+    local subtype = bit32.extract(constant, 4, 4)
+    local reversed = bit32.extract(constant, 8, 1)
+	return  type + 1, control.stopped_train_signal, control.priority_signal, 0, reversed == 1
 end
 
 function open_station_gui(rootgui, entity, player)
-    local selected_type, network, item, subtype = get_station_gui_settings(entity)
-    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item)})
+    local selected_type, network, item, subtype, reversed = get_station_gui_settings(entity)
+    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item, reversed)})
     gui_ref = mainscreen
     gui_ref.frame.vflow_main.preview_frame.preview.entity = entity
     gui_ref.titlebar.drag_target = gui_ref
