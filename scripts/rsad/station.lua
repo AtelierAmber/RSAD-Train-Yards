@@ -15,7 +15,6 @@ require("scripts.rsad.util")
 ---@field public unit_number uint
 ---@field public assignments uint -- Number of assigned trains to this station
 ---@field public parked_train uint? -- train ID that is currently parked at this station. Wagons without a locomotive also have a train ID. nil if none
----@field public reversed_shunting boolean -- Determines which direction shunting trains stop at. True: They will come from the opposite side of the station
 
 ---                                    success  data        
 -- ---@field public data fun(self: self): boolean, StationData?
