@@ -3,7 +3,7 @@ require("scripts.rsad.station")
 scheduler = require("scripts.rsad.scheduler")
 require("scripts.util.events")
 
-ticks_per_update = 360/settings.startup["rsad-station-update-rate"].value --[[@as int]]
+ticks_per_update = math.floor(360/settings.startup["rsad-station-update-rate"].value) + 1
 
 ---@type string?
 active_yard = nil
@@ -14,7 +14,7 @@ local next = next -- Assign local table next for indexing speed
 rsad_controller = {
     stations = {}, --[[@type table<uint, RSADStation>]]
     train_yards = {}, --[[@type table<string, TrainYard>]]
-    scheduler = scheduler
+    scheduler = scheduler --[[@type scheduler]]
 }
 
 ---@param self rsad_controller
@@ -36,7 +36,7 @@ end
 ---@param tick_data NthTickEventData
 function rsad_controller.__tick(self, tick_data)
     --- Check first if any shunting orders need to be issued
-    if self.scheduler:tick() then end
+    if self.scheduler:tick(self) then end
 
     ---@type TrainYard?
     local yard
@@ -45,7 +45,7 @@ function rsad_controller.__tick(self, tick_data)
     while active_yard ~= nil do
         yard = self.train_yards[active_yard]
         if yard then
-            if yard:tick() then break end
+            if yard:tick(self) then break end
         end
         ---@diagnostic disable-next-line: unbalanced-assignments
         k, yard = next(self.train_yards, active_yard)
