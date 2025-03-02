@@ -55,6 +55,24 @@ function rsad_controller.__tick(self, tick_data)
 end
 
 ---@param self rsad_controller
+---@param train LuaTrain
+---@param old_state defines.train_state
+function rsad_controller.__on_train_state_change(self, train, old_state)
+    if train.state == defines.train_state.wait_station then
+        local rsad_station = self.stations[train.station.unit_number]
+        if rsad_station then
+            local success, station_entity, data = get_station_data(rsad_station)
+            if success and data and data.type == rsad_station_type.shunting_depot then
+                local yard = self:get_or_create_train_yard(data.network)
+                if yard then
+                    yard:add_new_shunter(train)
+                end
+            end
+        end
+    end
+end
+
+---@param self rsad_controller
 ---@param entity LuaEntity
 ---@return boolean
 function rsad_controller.__on_station_destroyed(self, entity)
@@ -107,6 +125,7 @@ function rsad_controller.register_events(self)
    events.register_break("name", names.entities.rsad_station, function(entity) return self:__on_station_destroyed(entity) end)
    events.register_build("name", names.entities.rsad_station, function(entity) return self:__on_station_built(entity) end)
    events.register_paste(function(entity) self:__on_paste_settings(entity) end )
+   events.register_train_handler(defines.events.on_train_changed_state, function(data) self:__on_train_state_change(data.train, data.old_state) end)
    script.on_nth_tick(ticks_per_update, function(tick_data) self:__tick(tick_data) end)
 end
 
@@ -172,7 +191,7 @@ end
 ---@param station RSADStation
 function rsad_controller.decommision_station_from_yard(self, station)
     if not station then return end
-    local success, data = get_station_data(station)
+    local success, entity, data = get_station_data(station)
     if not success or not data then
         self.stations[station.unit_number] = nil
         return

@@ -6,7 +6,7 @@ queue = require("__flib__.queue")
 
 ---@class PendingChange
 ---@field public station RSADStation
----@field public assign_schedule fun(yard:TrainYard, ...:any): ScheduleRecord[]
+---@field public create_schedule fun(yard:TrainYard, ...:any): ScheduleRecord[]
 
 ---@class scheduler
 scheduler = {
@@ -71,7 +71,7 @@ end
 ---@return ScheduleRecord[]
 local function item_request_schedule(yard, requester_station)
     ---Create request station record
-    local data_scuccess, station_data = get_station_data(requester_station)
+    local data_scuccess, station_entity, station_data = get_station_data(requester_station)
     if not data_scuccess or not station_data then return {} end
     ---@type ScheduleRecord[]
     local records = {
@@ -88,7 +88,7 @@ local function item_request_schedule(yard, requester_station)
     ---Create pickup record
     local input_station = get_next_providing_station(yard, station_data.item and station_data.item.name)
     if not input_station then return {} end
-    data_scuccess, station_data = get_station_data(input_station)
+    data_scuccess, station_entity, station_data = get_station_data(input_station)
     if data_scuccess and station_data then
         table.insert(records, 1, default_target_record(input_station, station_data.reversed_shunting))
     end
@@ -102,7 +102,7 @@ end
 ---@return boolean, uint? --- Whether or not the request was successful, error number (nil if successful) 
 function scheduler.queue_station_request(self, controller, station)
     if not station then return false, 3 end
-    local success, data = get_station_data(station)
+    local success, station_entity, data = get_station_data(station)
     if not success or not data then return false, 4 end
     
     local yard = controller:get_or_create_train_yard(data.network) ---@type TrainYard?
@@ -119,7 +119,7 @@ function scheduler.queue_station_request(self, controller, station)
     ---@type PendingChange
     local queued_data = {
         station = station,
-        assign_schedule = item_request_schedule
+        create_schedule = item_request_schedule
     }
 
     queue.push_back(self.pending_changes, queued_data)
@@ -143,13 +143,13 @@ function scheduler.tick(self, controller)
     local change = queue.pop_front(self.pending_changes)
     if not change then return false end
 
-    local data_scuccess, station_data = get_station_data(change.station)
-    if not data_scuccess or not station_data or not station_data.network then goto tick_loop end
+    local data_scuccess, station_entity, station_data = get_station_data(change.station)
+    if not data_scuccess or not station_entity or not station_data or not station_data.network then goto tick_loop end
     local yard = controller:get_train_yard_or_nil(station_data.network)
     if not yard then goto tick_loop end
 
     ---Try to create schedule
-    local schedule = change.assign_schedule(yard, change.station)
+    local schedule = change.create_schedule(yard, change.station)
 
     ---Find an available and most convenient shunter
     local shunters =  yard.shunter_trains
@@ -160,12 +160,20 @@ function scheduler.tick(self, controller)
             first_idle = id
         elseif shunting_data.current_stage == rsad_shunting_stage.return_to_depot then
             ---Ensure Pathing is possible
-            if game.train_manager.request_train_path().found_path then
-                
+            local shunter_train = game.train_manager.get_train_by_id(id)
+            if shunter_train and game.train_manager.request_train_path({train = shunter_train, shortest_path = true, search_direction = "any-direction-with-locomotives", goals = {{train_stop = station_entity}}}).found_path then
+                first_finishing = id
             end
         end
     end
+    
+    local train = game.train_manager.get_train_by_id(first_finishing or first_idle or 0)
+    if train then
+        train.schedule = schedule
+        train.manual_mode = false
 
+        return true
+    end
 
     return false
 end

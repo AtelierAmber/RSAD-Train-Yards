@@ -5,7 +5,6 @@ local next = next -- Assign local table next for indexing speed
 
 ---@class ShuntingData
 ---@field public current_stage rsad_shunting_stage
----@field public schedule TrainSchedule
 
 ---@see create_train_yard
 ---@class TrainYard
@@ -24,6 +23,7 @@ local next = next -- Assign local table next for indexing speed
 ---@field public is_empty fun(self: self): boolean --- Returns true if no stations exist in this yard
 ---@field public decommision fun(self: self) --- Returns true if no stations exist in this yard
 ---@field public tick fun(self: self, controller: rsad_controller)
+---@field public add_new_shunter fun(self:self, train: LuaTrain)
 
 --- TODO: Make custom schedules possible
 
@@ -66,7 +66,7 @@ end
 ---@param station RSADStation
 ---@return boolean success
 local function add_or_update_station(yard, station)
-    local success, data = get_station_data(station)
+    local success, station_entity, data = get_station_data(station)
     yard:remove_station(station)
 
     if not success or not data or not data.type then return false end
@@ -87,6 +87,12 @@ local function add_or_update_station(yard, station)
     return true
 end
 
+---@param yard TrainYard
+---@param train LuaTrain
+local function add_new_shunter(yard, train)
+    yard.shunter_trains[train.id] = {current_stage = rsad_shunting_stage.available}
+end
+
 local function decommision_yard()
 
 end
@@ -102,7 +108,7 @@ local function tick(yard, controller)
         for unit, item in pairs(yard[rsad_station_type.request]) do
             local station = controller.stations[unit]
             if not station then goto continue end
-            local data_success, data = get_station_data(station)
+            local data_success, station_entity, data = get_station_data(station)
             if station.parked_train then
                 local contents = game.train_manager.get_train_by_id(station.parked_train).get_contents()
                 if not contents or next(contents) == nil then
@@ -146,14 +152,15 @@ function create_train_yard(network)
         [rsad_station_type.request] = {}, -- list of all request stations and their requested item. Can only be assigned to a single item
         [rsad_station_type.empty_staging] = {}, -- staging for empty wagons
         [rsad_station_type.empty_pickup] = {}, -- staging for empty wagons
-        --shunter_trains = storage.shunter_trains[network],
+        shunter_trains = {},
 
         -- Functions
         add_or_update_station = add_or_update_station,
         remove_station = remove_station,
         is_empty = is_empty,
         decommision = decommision_yard,
-        tick = tick
+        tick = tick,
+        add_new_shunter = add_new_shunter
     }
     --[[@type TrainYard]]
     return yard

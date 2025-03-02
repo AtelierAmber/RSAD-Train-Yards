@@ -71,6 +71,7 @@ local function on_broken(event)
 	if not entity or not entity.valid then return end
 
     for kind, registrar in pairs(destroy_registrar) do
+        if not registrar then goto continue end
         if kind == "name" then
             if (registrar and registrar[entity.name]) then
                 for _, func in pairs(registrar[entity.name]) do
@@ -114,12 +115,14 @@ local function on_broken(event)
                 end
             end
         end
+        ::continue::
     end
 end
 
 ---@param event EventData.on_entity_settings_pasted
 local function on_train_event(event)
     local registrar = train_registrar[event.name]
+    if not registrar then return end
     for _, registry in pairs(registrar) do
         if registry then
             registry(event)
@@ -214,6 +217,7 @@ function events.register_paste(func)
 end
 
 local function register_build_events()
+    if not next(build_registrar) then return end 
     --NOTE: Using the on placement trigger might be better but would have to expand a lot of things and it would only work on a per-prototype basis
 	script.on_event(defines.events.on_built_entity, on_built, build_filter)
 	script.on_event(defines.events.on_robot_built_entity, on_built, build_filter)
@@ -228,6 +232,7 @@ local function register_build_events()
 end
 
 local function register_destroy_events()
+    if not next(destroy_registrar) then return end 
     script.on_event(defines.events.on_pre_player_mined_item, on_broken, destroy_filter)
 	script.on_event(defines.events.on_robot_pre_mined, on_broken, destroy_filter)
 	script.on_event(defines.events.on_space_platform_pre_mined, on_broken, destroy_filter)
@@ -236,6 +241,7 @@ local function register_destroy_events()
 end
 
 local function register_train_events()
+    if not next(train_registrar) then return end 
     script.on_event(defines.events.on_train_changed_state, on_train_event)
     script.on_event(defines.events.on_train_created, on_train_event)
     script.on_event(defines.events.on_train_schedule_changed, on_train_event)

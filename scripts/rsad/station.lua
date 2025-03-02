@@ -42,7 +42,7 @@ local function pack_station_constant(type, subtype, reversed)
 end
 
 ---@param station RSADStation
----@return boolean success, StationData? data
+---@return boolean success, LuaEntity? station_entity, StationData? data
 function get_station_data(station)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
     if not station_entity then return false end
@@ -61,7 +61,7 @@ function get_station_data(station)
         train_limit = station_entity.trains_limit
     }
 
-    return true, data
+    return true, station_entity, data
 end
 
 ---@param station RSADStation
