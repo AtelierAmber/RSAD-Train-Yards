@@ -422,7 +422,7 @@ function open_station_gui(rootgui, entity, player)
     mainscreen.force_auto_center()
 
     mainscreen.tags = {unit_number = entity.unit_number}
-    set_modal_visibility(selected_type-1)
+    set_modal_visibility(selected_type-1, mainscreen)
     player.opened = mainscreen
 end
 

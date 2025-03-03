@@ -13,43 +13,24 @@ local next = next -- Assign local table next for indexing speed
 ---@class rsad_controller
 rsad_controller = {
     stations = nil, --[[@type table<uint, RSADStation>]]
-    train_yards = {}, --[[@type table<string, TrainYard>]]
+    train_yards = nil, --[[@type table<string, TrainYard>]]
     scheduler = scheduler --[[@type scheduler]]
 }
 
 ---@param self rsad_controller
 function rsad_controller.__init(self)
     storage.stations = {} --[[@type table<uint, RSADStation>]]
-    storage.shunter_trains = {} --[[@type table<string, table<uint, ShuntingData>>}]]
+    --storage.shunter_trains = {} --[[@type table<string, table<uint, ShuntingData>>}]]
+    storage.train_yards = {} --[[@type table<string, TrainYard>]]
     self.stations = storage.stations
+    self.train_yards = storage.train_yards
 end
 
 ---@param self rsad_controller
 function rsad_controller.__load(self)
     --- Create train yards
     self.stations = storage.stations
-    if not self.stations then log("Canceling RSAD OnLoad pending migration.") return end --Signifies needing a migration 
-    for _, station in pairs(self.stations) do
-        local success, entity, data = get_station_data(station)
-        if not success or not data or not data.network then goto continue end
-        local yard = self:get_or_create_train_yard(data.network)
-        if not yard then goto continue end
-        yard:add_or_update_station(station)
-
-        ::continue::
-    end
-
-    for hash, yard in pairs(self.train_yards) do
-        if not storage.shunter_trains[hash] then
-            storage.shunter_trains[hash] = {}
-        end
-
-        yard.shunter_trains = storage.shunter_trains[hash]
-    end
-
-    game.print(serpent.block(self.stations))
-    game.print("\n--------------------------------\n")
-    game.print(serpent.block(self.train_yards))
+    self.train_yards = storage.train_yards
 end
 
 ---@param self rsad_controller
@@ -92,7 +73,7 @@ function rsad_controller.__on_station_destroyed(self, entity)
     local station = self.stations[entity.unit_number]
     if not station then return true end
 
-    self:decommision_station_from_yard(station)
+    self:decommision_station_from_yard(station, true)
     --game.print(serpent.block(self.stations))
     return true
 end
@@ -193,7 +174,6 @@ function rsad_controller.construct_station(self, entity, network)
     end
 
     self.stations[entity.unit_number] = station
-    update_station_data(station, {network = network})
     yard:add_or_update_station(station)
     return station
 end
@@ -201,7 +181,8 @@ end
 ---comment
 ---@param self rsad_controller
 ---@param station RSADStation
-function rsad_controller.decommision_station_from_yard(self, station)
+---@param keep_network boolean? --If true, it will keep the network assigned in the station. Used only for destroying
+function rsad_controller.decommision_station_from_yard(self, station, keep_network)
     if not station then return end
     local success, entity, data = get_station_data(station)
     if not success or not data then
@@ -212,7 +193,7 @@ function rsad_controller.decommision_station_from_yard(self, station)
     local hash = signal_hash(data.network)
     if hash then
         local yard = data.network and self.train_yards[hash] --[[@as TrainYard?]]
-        if yard then 
+        if yard then
             yard:remove_station(station)
             if yard:is_empty() then
                 self.train_yards[hash] = nil
@@ -220,12 +201,14 @@ function rsad_controller.decommision_station_from_yard(self, station)
         end
     end
 
-    decommision_station(station)
+    if not keep_network then
+        decommision_station(station)
+    end
     self.stations[station.unit_number] = nil
 end
 
 ---comment
----@param self rsad_controller
+---am self rsad_controller
 ---@param station RSADStation
 ---@param new_network SignalID
 ---@return boolean
@@ -248,7 +231,6 @@ function rsad_controller.assign_shunter(self, train)
             local yard = self:get_or_create_train_yard(data.network)
             if yard then
                 yard:add_new_shunter(train)
-                storage.shunter_trains[signal_hash(yard.network)] = yard.shunter_trains
             end
         end
     end

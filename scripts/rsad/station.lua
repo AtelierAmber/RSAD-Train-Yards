@@ -45,7 +45,7 @@ end
 ---@return boolean success, LuaEntity? station_entity, StationData? data
 function get_station_data(station)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
-    if not station_entity then return false end
+    if not station_entity or not station_entity.valid then return false end
 
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
 
@@ -69,7 +69,7 @@ end
 ---@return boolean success
 function update_station_data(station, new_data)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
-    if not station_entity then return false end
+    if not station_entity or not station_entity.valid then return false end
 
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
@@ -101,7 +101,7 @@ end
 
 function decommision_station(station)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
-    if not station_entity then return false end
+    if not station_entity or not station_entity.valid then return false end
 
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     control.stopped_train_signal = nil
@@ -118,6 +118,5 @@ function create_rsad_station(entity)
         parked_train = nil
     } --[[@type RSADStation]]
     
-
     return station
 end

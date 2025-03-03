@@ -61,6 +61,7 @@ local function get_next_providing_station(yard, item)
         if station.parked_train then
             return station
         end
+        return station
     end
 
     return nil
@@ -68,11 +69,11 @@ end
 
 ---@param yard TrainYard
 ---@param requester_station RSADStation
----@return ScheduleRecord[]
+---@return ScheduleRecord[]?
 local function item_request_schedule(yard, requester_station)
     ---Create request station record
     local data_scuccess, station_entity, station_data = get_station_data(requester_station)
-    if not data_scuccess or not station_data then return {} end
+    if not data_scuccess or not station_data then return nil end
     ---@type ScheduleRecord[]
     local records = {
         [1] = default_target_record(requester_station, station_data.reversed_shunting)
@@ -87,7 +88,7 @@ local function item_request_schedule(yard, requester_station)
     end
     ---Create pickup record
     local input_station = get_next_providing_station(yard, station_data.item and station_data.item.name)
-    if not input_station then return {} end
+    if not input_station then return nil end
     data_scuccess, station_entity, station_data = get_station_data(input_station)
     if data_scuccess and station_data then
         table.insert(records, 1, default_target_record(input_station, station_data.reversed_shunting))
@@ -149,7 +150,10 @@ function scheduler.tick(self, controller)
     if not yard then goto tick_loop end
 
     ---Try to create schedule
-    local schedule = change.create_schedule(yard, change.station)
+    local records = change.create_schedule(yard, change.station)
+    if not records then goto tick_loop end
+    ---@type TrainSchedule
+    local schedule = { current = 1, records = records}
 
     ---Find an available and most convenient shunter
     local shunters =  yard.shunter_trains
@@ -166,12 +170,13 @@ function scheduler.tick(self, controller)
             end
         end
     end
-    
     local train = game.train_manager.get_train_by_id(first_finishing or first_idle or 0)
     if train then
         train.schedule = schedule
         train.manual_mode = false
 
+        shunters[train.id].current_stage = rsad_shunting_stage.delivery
+        change.station.assignments  = change.station.assignments + 1
         return true
     end
 
