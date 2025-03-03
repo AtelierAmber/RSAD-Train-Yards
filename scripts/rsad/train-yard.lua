@@ -31,22 +31,22 @@ local next = next -- Assign local table next for indexing speed
 ---@param yard TrainYard
 ---@param station RSADStation
 local function remove_station(yard, station)
-    yard[rsad_station_type.shunting_depot][station.unit_number] = nil
+    yard[rsad_station_type.shunting_depot][station.entity.unit_number] = nil
     for stage, sta in pairs(yard[rsad_station_type.turnabout]) do
-        if sta and sta.unit_number == station.unit_number then
+        if sta and sta.unit_number == station.entity.unit_number then
             yard[rsad_station_type.turnabout][stage] = nil
         end
     end
-    yard[rsad_station_type.import_staging][station.unit_number] = nil
+    yard[rsad_station_type.import_staging][station.entity.unit_number] = nil
     for i,v in pairs(yard[rsad_station_type.import]) do
         v[station] = nil
         if next(v) == nil then
             yard[rsad_station_type.import][i] = nil
         end
     end
-    yard[rsad_station_type.request][station.unit_number] = nil
-    yard[rsad_station_type.empty_staging][station.unit_number] = nil
-    yard[rsad_station_type.empty_pickup][station.unit_number] = nil
+    yard[rsad_station_type.request][station.entity.unit_number] = nil
+    yard[rsad_station_type.empty_staging][station.entity.unit_number] = nil
+    yard[rsad_station_type.empty_pickup][station.entity.unit_number] = nil
 end
 
 ---@param yard TrainYard
@@ -75,11 +75,11 @@ local function add_or_update_station(yard, station)
         yard[data.type][data.subtype] = station
     elseif data.type == rsad_station_type.import and data.item and data.item.name then
         yard[data.type][data.item.name] = yard[data.type][data.item.name] or {}
-        yard[data.type][data.item.name][station.unit_number] = station
+        yard[data.type][data.item.name][station.entity.unit_number] = station
     elseif data.type == rsad_station_type.request and data.item and data.item.name then
-        yard[data.type][station.unit_number] = data.item.name
+        yard[data.type][station.entity.unit_number] = data.item.name
     else
-        yard[data.type][station.unit_number] = station
+        yard[data.type][station.entity.unit_number] = station
     end
 
     update_station_data(station, {network = yard.network})
@@ -114,8 +114,8 @@ local function tick(yard, controller)
                 if not contents or next(contents) == nil then
                     local schedule_success, error = controller.scheduler:queue_shunt_wagon_to_empty(controller, station)
                     if not schedule_success and error then
-                        game.print("Scheduling error code " .. error .. " at station " .. station.unit_number .. ". Please report this with the log file to the mod developer.")
-                        log("Scheduling error code " .. error .. " at station " .. station.unit_number .. ". Please report this with the log file to the mod developer.")
+                        game.print("Scheduling error code " .. error .. " at station " .. station.entity.unit_number .. ". Please report this with the log file to the mod developer.")
+                        log("Scheduling error code " .. error .. " at station " .. station.entity.unit_number .. ". Please report this with the log file to the mod developer.")
                         controller:decommision_station_from_yard(station)
                         goto continue
                     end
@@ -142,7 +142,12 @@ end
 ---@param network SignalID
 ---@return TrainYard
 function create_train_yard(network)
-    --storage.shunter_trains[network] = {}
+    local hash = signal_hash(network)
+    assert(hash, "Failed to hash network signal " .. serpent.line(network))
+    if not storage.shunter_trains[hash] then
+        storage.shunter_trains[hash] = {}
+    end
+
     local yard = {
         network = network,
         [rsad_station_type.shunting_depot] = {},
@@ -152,7 +157,7 @@ function create_train_yard(network)
         [rsad_station_type.request] = {}, -- list of all request stations and their requested item. Can only be assigned to a single item
         [rsad_station_type.empty_staging] = {}, -- staging for empty wagons
         [rsad_station_type.empty_pickup] = {}, -- staging for empty wagons
-        shunter_trains = {},
+        shunter_trains = storage.shunter_trains[hash],
 
         -- Functions
         add_or_update_station = add_or_update_station,

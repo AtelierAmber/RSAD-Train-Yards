@@ -255,8 +255,8 @@ function events.init()
 
 	script.on_event(defines.events.on_entity_settings_pasted, on_paste)
     
-    script.on_init()
-    script.on_load()
+    script.on_init(on_init)
+    script.on_load(on_load)
 	---script.on_event(defines.events.on_player_rotated_entity, on_rotate)
 
 	--script.on_event({ defines.events.on_pre_surface_deleted, defines.events.on_pre_surface_cleared }, on_surface_removed)

@@ -12,24 +12,44 @@ local next = next -- Assign local table next for indexing speed
 
 ---@class rsad_controller
 rsad_controller = {
-    stations = {}, --[[@type table<uint, RSADStation>]]
+    stations = nil, --[[@type table<uint, RSADStation>]]
     train_yards = {}, --[[@type table<string, TrainYard>]]
     scheduler = scheduler --[[@type scheduler]]
 }
 
 ---@param self rsad_controller
 function rsad_controller.__init(self)
-    --storage.stations = {}
-    --storage.shunter_trains = {} --[[@type table<string, table<uint, ShuntingData>>}]]
+    storage.stations = {} --[[@type table<uint, RSADStation>]]
+    storage.shunter_trains = {} --[[@type table<string, table<uint, ShuntingData>>}]]
+    self.stations = storage.stations
 end
 
 ---@param self rsad_controller
 function rsad_controller.__load(self)
-    if storage.shunter_trains then
-        for network, trains in pairs(storage.shunter_trains) do
-            
-        end
+    --- Create train yards
+    self.stations = storage.stations
+    if not self.stations then log("Canceling RSAD OnLoad pending migration.") return end --Signifies needing a migration 
+    for _, station in pairs(self.stations) do
+        local success, entity, data = get_station_data(station)
+        if not success or not data or not data.network then goto continue end
+        local yard = self:get_or_create_train_yard(data.network)
+        if not yard then goto continue end
+        yard:add_or_update_station(station)
+
+        ::continue::
     end
+
+    for hash, yard in pairs(self.train_yards) do
+        if not storage.shunter_trains[hash] then
+            storage.shunter_trains[hash] = {}
+        end
+
+        yard.shunter_trains = storage.shunter_trains[hash]
+    end
+
+    game.print(serpent.block(self.stations))
+    game.print("\n--------------------------------\n")
+    game.print(serpent.block(self.train_yards))
 end
 
 ---@param self rsad_controller
@@ -59,16 +79,7 @@ end
 ---@param old_state defines.train_state
 function rsad_controller.__on_train_state_change(self, train, old_state)
     if train.state == defines.train_state.wait_station then
-        local rsad_station = self.stations[train.station.unit_number]
-        if rsad_station then
-            local success, station_entity, data = get_station_data(rsad_station)
-            if success and data and data.type == rsad_station_type.shunting_depot then
-                local yard = self:get_or_create_train_yard(data.network)
-                if yard then
-                    yard:add_new_shunter(train)
-                end
-            end
-        end
+        self:assign_shunter(train)
     end
 end
 
@@ -127,6 +138,7 @@ function rsad_controller.register_events(self)
    events.register_paste(function(entity) self:__on_paste_settings(entity) end )
    events.register_train_handler(defines.events.on_train_changed_state, function(data) self:__on_train_state_change(data.train, data.old_state) end)
    script.on_nth_tick(ticks_per_update, function(tick_data) self:__tick(tick_data) end)
+   script.on_event(defines.events.on_player_created, function(data) self:__load() end)
 end
 
 ---@param self rsad_controller
@@ -223,6 +235,23 @@ function rsad_controller.migrate_station(self, station, new_network)
     
     self:decommision_station_from_yard(station)
     return new_yard:add_or_update_station(station)
+end
+
+---comment
+---@param self rsad_controller
+---@param train LuaTrain
+function rsad_controller.assign_shunter(self, train)
+    local rsad_station = self.stations[train.station.unit_number]
+    if rsad_station then
+        local success, station_entity, data = get_station_data(rsad_station)
+        if success and data and data.type == rsad_station_type.shunting_depot then
+            local yard = self:get_or_create_train_yard(data.network)
+            if yard then
+                yard:add_new_shunter(train)
+                storage.shunter_trains[signal_hash(yard.network)] = yard.shunter_trains
+            end
+        end
+    end
 end
 
 return rsad_controller
