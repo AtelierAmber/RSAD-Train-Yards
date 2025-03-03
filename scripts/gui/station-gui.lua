@@ -21,9 +21,6 @@ STATUS_SPRITES[defines.entity_status.marked_for_deconstruction] = RED
 local STATUS_SPRITES_DEFAULT = RED
 local STATUS_SPRITES_GHOST = YELLOW
 
-
-local gui_ref
-
 ---@param e EventData.on_gui_click
 function handle_close(e)
     local element = e.element
@@ -45,33 +42,33 @@ function handle_close(e)
 end
 
 ---@param selected_type rsad_station_type
-function set_modal_visibility(selected_type)
+function set_modal_visibility(selected_type, mainscreen)
     if selected_type == rsad_station_type.turnabout then
         --- Hide item signal
-        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
 
     elseif selected_type == rsad_station_type.shunting_depot then
         --- Hide item signal
-        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
         
     elseif selected_type == rsad_station_type.request then
         --- Show item signal
-        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = true
+        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = true
         
     elseif selected_type == rsad_station_type.import_staging then
         --- Hide item signal
-        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
         
     elseif selected_type == rsad_station_type.import then
         --- Show item signal
-        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = true
+        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = true
     elseif selected_type == rsad_station_type.empty_staging then
         --- Hide item signal
-        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
         
     elseif selected_type == rsad_station_type.empty_pickup then
         --- Hide item signal
-        gui_ref.frame.vflow_main.hflow_signals.vflow_item.visible = false
+        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
         
     end
 end
@@ -104,9 +101,11 @@ function handle_type_drop_down(e)
 
     update_rsad_station_name(entity, control, index)
 
-    gui_ref.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. index}, " Station"}
+    local player = game.get_player(e.player_index)
+    if not player then return end
+    player.opened.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. index}, " Station"}
 
-	set_modal_visibility(index)
+	set_modal_visibility(index, player.opened)
 end
 
 
@@ -417,14 +416,13 @@ end
 function open_station_gui(rootgui, entity, player)
     local selected_type, network, item, subtype, reversed = get_station_gui_settings(entity)
     local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item, reversed)})
-    gui_ref = mainscreen
-    gui_ref.frame.vflow_main.preview_frame.preview.entity = entity
-    gui_ref.titlebar.drag_target = gui_ref
-    gui_ref.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. (selected_type-1)}, " Station"}
-    gui_ref.force_auto_center()
+    mainscreen.frame.vflow_main.preview_frame.preview.entity = entity
+    mainscreen.titlebar.drag_target = mainscreen
+    mainscreen.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. (selected_type-1)}, " Station"}
+    mainscreen.force_auto_center()
 
-    gui_ref.tags = {unit_number = entity.unit_number}
+    mainscreen.tags = {unit_number = entity.unit_number}
     set_modal_visibility(selected_type-1)
-    player.opened = gui_ref
+    player.opened = mainscreen
 end
 
