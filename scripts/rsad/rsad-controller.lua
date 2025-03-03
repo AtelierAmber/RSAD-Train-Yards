@@ -60,8 +60,9 @@ end
 ---@param old_state defines.train_state
 function rsad_controller.__on_train_state_change(self, train, old_state)
     if train.state == defines.train_state.wait_station then
-        self:assign_shunter(train)
+        self:assign_shunter(train) --Includes a check to make sure it's arrived at a shunting_depot
     end
+    self.scheduler:manage_train_state_change(train, old_state)
 end
 
 ---@param self rsad_controller

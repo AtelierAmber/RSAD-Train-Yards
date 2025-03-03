@@ -137,6 +137,17 @@ function scheduler.queue_shunt_wagon_to_empty(self, controller, station)
 end
 
 ---@param self scheduler
+---@param train LuaTrain
+---@param old_state defines.train_state
+---@param return_depot RSADStation
+function scheduler.manage_train_state_change(self, train, old_state, return_depot)
+    local schedule = train.schedule
+    if schedule and schedule.current == #schedule.records then
+        train.schedule = default_target_record(return_depot)
+    end
+end
+
+---@param self scheduler
 ---@param controller rsad_controller
 ---@return boolean ---False if no update was necessary. True if an update was processed
 function scheduler.tick(self, controller)
@@ -170,6 +181,7 @@ function scheduler.tick(self, controller)
             end
         end
     end
+
     local train = game.train_manager.get_train_by_id(first_finishing or first_idle or 0)
     if train then
         train.schedule = schedule
