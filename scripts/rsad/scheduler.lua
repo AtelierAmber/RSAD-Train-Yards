@@ -139,11 +139,14 @@ end
 ---@param self scheduler
 ---@param train LuaTrain
 ---@param old_state defines.train_state
----@param return_depot RSADStation
+---@param return_depot RSADStation?
 function scheduler.manage_train_state_change(self, train, old_state, return_depot)
     local schedule = train.schedule
-    if schedule and schedule.current == #schedule.records then
-        train.schedule = default_target_record(return_depot)
+    if train.state == defines.train_state.wait_station and schedule and schedule.current == #schedule.records and return_depot then
+        local records = {
+            [1] = default_target_record(return_depot, false)
+        }
+        train.schedule = {current = 1, records = records}
     end
 end
 

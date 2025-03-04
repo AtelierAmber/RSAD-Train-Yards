@@ -61,6 +61,13 @@ local function is_empty(self)
            next(self[rsad_station_type.empty_pickup]) == nil
 end
 
+---@param self TrainYard
+---@param train LuaTrain
+local function add_new_shunter(self, train)
+    self.shunter_trains[train.id] = {current_stage = rsad_shunting_stage.available}
+end
+
+
 --- Adds the station to the relevant array or modifies an existing station to a new designation
 ---@param self TrainYard
 ---@param station RSADStation
@@ -86,15 +93,16 @@ local function add_or_update_station(self, station)
         self[data.type][station.unit_number] = station
     end
 
+    if data.type == rsad_station_type.shunting_depot then
+        if station_entity then
+            local train = station_entity.get_stopped_train()
+            if train then add_new_shunter(self, train) end
+        end
+    end
+
     update_station_data(station, { network = self.network })
 
     return true
-end
-
----@param self TrainYard
----@param train LuaTrain
-local function add_new_shunter(self, train)
-    self.shunter_trains[train.id] = {current_stage = rsad_shunting_stage.available}
 end
 
 local function decommision_yard()

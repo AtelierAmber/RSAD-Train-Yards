@@ -59,10 +59,18 @@ end
 ---@param train LuaTrain
 ---@param old_state defines.train_state
 function rsad_controller.__on_train_state_change(self, train, old_state)
-    if train.state == defines.train_state.wait_station then
-        self:assign_shunter(train) --Includes a check to make sure it's arrived at a shunting_depot
+    local station = train.station and self.stations[train.station.unit_number]
+    if not station then return end
+    local success, station_entity, data = get_station_data(station)
+    if not success or not data then return end
+    local yard = self:get_train_yard_or_nil(data.network)
+    if yard then
+        if train.state == defines.train_state.wait_station and data.type == rsad_station_type.shunting_depot then
+            self:assign_shunter(train, yard)
+        end
+
+        self.scheduler:manage_train_state_change(train, old_state, select(2, next(yard[rsad_station_type.shunting_depot])))
     end
-    self.scheduler:manage_train_state_change(train, old_state)
 end
 
 ---@param self rsad_controller
@@ -224,17 +232,9 @@ end
 ---comment
 ---@param self rsad_controller
 ---@param train LuaTrain
-function rsad_controller.assign_shunter(self, train)
-    local rsad_station = self.stations[train.station.unit_number]
-    if rsad_station then
-        local success, station_entity, data = get_station_data(rsad_station)
-        if success and data and data.type == rsad_station_type.shunting_depot then
-            local yard = self:get_or_create_train_yard(data.network)
-            if yard then
-                yard:add_new_shunter(train)
-            end
-        end
-    end
+---@param yard TrainYard
+function rsad_controller.assign_shunter(self, train, yard)
+    yard:add_new_shunter(train)
 end
 
 return rsad_controller
