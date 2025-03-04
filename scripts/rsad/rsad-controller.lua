@@ -73,6 +73,8 @@ function rsad_controller.__on_train_state_change(self, train, old_state)
     end
 end
 
+--- TODO: ON TRAIN DESTROY
+
 ---@param self rsad_controller
 ---@param entity LuaEntity
 ---@return boolean

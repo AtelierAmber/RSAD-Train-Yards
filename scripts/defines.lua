@@ -26,3 +26,10 @@ rsad_shunting_stage = {
     clear_empty = 3 --[[@as rsad_shunting_stage.clear_empty ]], -- clearing empty wagons and shunt them to the staged train if possible
     return_to_depot = 4 --[[@as rsad_shunting_stage.delivery ]], -- returning from other stage
 } 
+
+rsad_stage_name = {}
+rsad_stage_name[rsad_shunting_stage.available] = "Available"
+rsad_stage_name[rsad_shunting_stage.sort_imports] = "Import Sorting"
+rsad_stage_name[rsad_shunting_stage.delivery] = "Item Delivery"
+rsad_stage_name[rsad_shunting_stage.clear_empty] = "Empty Wagon Clear"
+rsad_stage_name[rsad_shunting_stage.return_to_depot] = "Depot Return"

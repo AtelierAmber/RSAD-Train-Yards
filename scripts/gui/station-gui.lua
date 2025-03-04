@@ -41,36 +41,28 @@ function handle_close(e)
 	end
 end
 
+---@class VisibilityToggles
+---@field public item boolean
+---@field public turnabout boolean
+
+---@type table<uint, VisibilityToggles>
+local modal_visibilities = {
+    [rsad_station_type.turnabout] = { item = false, turnabout = true },
+    [rsad_station_type.shunting_depot] = { item = false, turnabout = false },
+    [rsad_station_type.request] = { item = true, turnabout = false },
+    [rsad_station_type.import_staging] = { item = false, turnabout = false },
+    [rsad_station_type.import] = { item = true, turnabout = false },
+    [rsad_station_type.empty_staging] = { item = false, turnabout = false },
+    [rsad_station_type.empty_pickup] = { item = false, turnabout = false },
+}
+
 ---@param selected_type rsad_station_type
 function set_modal_visibility(selected_type, mainscreen)
-    if selected_type == rsad_station_type.turnabout then
-        --- Hide item signal
-        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
-
-    elseif selected_type == rsad_station_type.shunting_depot then
-        --- Hide item signal
-        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
-        
-    elseif selected_type == rsad_station_type.request then
-        --- Show item signal
-        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = true
-        
-    elseif selected_type == rsad_station_type.import_staging then
-        --- Hide item signal
-        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
-        
-    elseif selected_type == rsad_station_type.import then
-        --- Show item signal
-        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = true
-    elseif selected_type == rsad_station_type.empty_staging then
-        --- Hide item signal
-        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
-        
-    elseif selected_type == rsad_station_type.empty_pickup then
-        --- Hide item signal
-        mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = false
-        
-    end
+    --- Item signal
+    mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = modal_visibilities[selected_type].item
+    --- Subtype
+    mainscreen.frame.vflow_main.vflow_subtype.visible = modal_visibilities[selected_type].turnabout
+    mainscreen.frame.vflow_main.vflow_subtype.turnabout_type.visible = modal_visibilities[selected_type].turnabout
 end
 
 ---@param e EventData.on_gui_selection_state_changed
@@ -86,8 +78,13 @@ function handle_type_drop_down(e)
 
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local circuit = control.circuit_condition
+    if bit32.extract(circuit.constant, 0, 4) == index then return end 
     ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    circuit.constant = bit32.replace(circuit.constant, index, 0, 4)
+    circuit.constant = index
+    if index == rsad_station_type.turnabout then
+---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+        circuit.constant = bit32.replace(index, 1, 4, 4)
+    end
     control.circuit_condition = circuit
 
     local station = rsad_controller.stations[unit_number]
@@ -108,6 +105,32 @@ function handle_type_drop_down(e)
 	set_modal_visibility(index, player.opened)
 end
 
+function handle_turnabout_drop_down(e)
+    local element = e.element
+	if not element then return end
+
+    local unit_number = element.tags.id --[[@as uint]]
+	local entity = game.get_entity_by_unit_number(unit_number)
+	if not entity or not entity.valid then return end
+
+    local index = element.selected_index
+
+    local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    local circuit = control.circuit_condition
+    ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    circuit.constant = bit32.replace(circuit.constant, index, 4, 4)
+    control.circuit_condition = circuit
+
+    local station = rsad_controller.stations[unit_number]
+    if control.stopped_train_signal and station and entity.name ~= "entity-ghost" then
+        local yard = rsad_controller:get_or_create_train_yard(control.stopped_train_signal)
+        if yard then
+            yard:add_or_update_station(station)
+        end
+    end
+
+    update_rsad_station_name(entity, control, bit32.extract(circuit.constant, 0, 4))
+end
 
 ---@param e EventData.on_gui_elem_changed
 function handle_network(e)
@@ -176,7 +199,7 @@ end
 ---@param item SignalID?
 ---@param reversed boolean
 ---@return flib.GuiElemDef
-function station_gui(entity, player, selected_index, network, item, reversed) return {
+function station_gui(entity, player, selected_index, network, item, reversed, subtype) return {
     type = "frame",
     direction = "vertical",
     name = names.gui.rsad_station,
@@ -254,7 +277,7 @@ function station_gui(entity, player, selected_index, network, item, reversed) re
                             { type = "entity-preview", name = "preview", style = "wide_entity_button" },
                         },
                     },
-                    --drop down
+                    --Type drop down
                     {
                         type = "label",
                         style = "heading_2_label",
@@ -311,6 +334,41 @@ function station_gui(entity, player, selected_index, network, item, reversed) re
                                 switch_state = reversed and "right" or "left",
                                 handler = handle_reversed,
                                 tags = { id = entity.unit_number },
+                            }
+                        }
+                    },
+                    ---Subtype section
+                    {
+                        type = "flow",
+                        name = "vflow_subtype",
+                        direction = "vertical",
+                        style_mods = {horizontal_align = "center"},
+                        children = {
+                            { type = "line", style_mods = { top_padding = 10 } },
+                            {
+                                type = "flow",
+                                name = "turnabout_type",
+                                direction = "vertical",
+                                style_mods = {horizontal_align = "left"},
+                                children = {
+                                    {
+                                        type = "label",
+                                        style = "heading_2_label",
+                                        caption = { "rsad-gui.station-turnabout" }
+                                    },
+                                    {
+                                        type = "drop-down",
+                                        style_mods = { top_padding = 3, right_margin = 8 },
+                                        handler = handle_turnabout_drop_down,
+                                        tags = { id = entity.unit_number },
+                                        selected_index = subtype,
+                                        items = {
+                                            { "rsad-gui.turnabout-phase.phase-1" },
+                                            { "rsad-gui.turnabout-phase.phase-2" },
+                                            { "rsad-gui.turnabout-phase.phase-3" },
+                                        },
+                                    }
+                                }
                             }
                         }
                     },
@@ -401,6 +459,7 @@ function station_gui(entity, player, selected_index, network, item, reversed) re
     }
 } end
 
+
 ---@param entity LuaEntity
 ---@return uint selected_type, SignalID? network, SignalID? item, uint subtype, boolean reversed
 function get_station_gui_settings(entity)
@@ -410,12 +469,12 @@ function get_station_gui_settings(entity)
     local type = bit32.extract(constant, 0, 4)
     local subtype = bit32.extract(constant, 4, 4)
     local reversed = bit32.extract(constant, 8, 1)
-	return  type + 1, control.stopped_train_signal, control.priority_signal, 0, reversed == 1
+	return  type + 1, control.stopped_train_signal, control.priority_signal, subtype, reversed == 1
 end
 
 function open_station_gui(rootgui, entity, player)
     local selected_type, network, item, subtype, reversed = get_station_gui_settings(entity)
-    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item, reversed)})
+    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item, reversed, subtype)})
     mainscreen.frame.vflow_main.preview_frame.preview.entity = entity
     mainscreen.titlebar.drag_target = mainscreen
     mainscreen.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. (selected_type-1)}, " Station"}

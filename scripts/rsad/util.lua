@@ -14,7 +14,13 @@ function update_rsad_station_name(entity, control, index)
     if control.priority_signal and (index == rsad_station_type.import or index == rsad_station_type.request) then 
         item_name = "[" .. (("item=" .. control.priority_signal.name) or "No Item") .. "]"
     end
-    entity.backer_name = "RSAD Controlled | [" .. network_name .. "] " .. rsad_station_name[index] .. item_name
+    local turnabout_phase_string = ""
+    ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    local turnabout_phase = bit32.extract(control.circuit_condition.constant, 4, 4)
+    if index == rsad_station_type.turnabout then
+        turnabout_phase_string = rsad_stage_name[turnabout_phase] .. " "
+    end
+    entity.backer_name = "RSAD Controlled | [" .. network_name .. "] " .. turnabout_phase_string .. rsad_station_name[index] .. item_name
 end
 
 ---comment

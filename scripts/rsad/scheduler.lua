@@ -23,10 +23,12 @@ local function default_target_record(target_station, reversed)
     if not target_entity then return {} end
     local target_rail = target_entity.connected_rail
     local reversed_rail_direction = target_entity.connected_rail_direction == defines.rail_direction.back and defines.rail_direction.front or defines.rail_direction.back
-    
+    local station_name = nil
+    if not reversed then station_name = target_entity.backer_name end
+
     ---@type ScheduleRecord
     return {
-        station = reversed and nil or target_entity.backer_name,
+        station = station_name,
         rail = target_rail,
         rail_direction = reversed and reversed_rail_direction or target_entity.connected_rail_direction,
         wait_conditions = {
@@ -75,8 +77,9 @@ local function item_request_schedule(yard, requester_station)
     local data_scuccess, station_entity, station_data = get_station_data(requester_station)
     if not data_scuccess or not station_data then return nil end
     ---@type ScheduleRecord[]
+    local request_record = default_target_record(requester_station, station_data.reversed_shunting)
     local records = {
-        [1] = default_target_record(requester_station, station_data.reversed_shunting)
+        [1] = request_record
     }
     ---Check for turnabout
     local turnabout_station = yard[rsad_station_type.turnabout][rsad_shunting_stage.delivery]

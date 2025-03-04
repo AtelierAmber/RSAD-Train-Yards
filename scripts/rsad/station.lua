@@ -29,7 +29,7 @@ local function unpack_station_constant(constant)
     --- Layout: Station Type | Station Subtype | Reversed Shunting |
     local type = bit32.extract(constant, 0, 4)              -- 0000 0000 1111
     local subtype = bit32.extract(constant, 4, 4)           -- 0000 1111 0000
-    local reversed = bit32.extract(constant, 8, 1) == 0     -- 0001 0000 0000
+    local reversed = bit32.extract(constant, 8, 1) == 1     -- 0001 0000 0000
     return type, subtype, reversed
 end
 
@@ -50,7 +50,7 @@ function get_station_data(station)
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
 
 ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.53
-    local type, subtype = unpack_station_constant(control.circuit_condition.constant)
+    local type, subtype, reversed = unpack_station_constant(control.circuit_condition.constant)
     
     ---@type StationData
     local data = {
@@ -58,7 +58,8 @@ function get_station_data(station)
         network = control.stopped_train_signal,
         item = control.priority_signal,
         subtype = subtype,
-        train_limit = station_entity.trains_limit
+        train_limit = station_entity.trains_limit,
+        reversed_shunting = reversed
     }
 
     return true, station_entity, data
