@@ -183,17 +183,17 @@ function events.register_build(kind, name, func)
 end
 
 -- If event function returns false, stop processing event
----@param kind string
----@param name string
+---@param kind "type"|"name"|"ghost"|"rail"|"rail-signal"|"rolling-stock"|"robot-with-logistics-interface"|"vehicle"|"turret"|"crafting-machine"|"wall-connectable"|"transport-belt-connectable"|"circuit-network-connectable"|"ghost_type"|"ghost_name"
+---@param name string?
 ---@param func fun(entity:LuaEntity):boolean
 function events.register_break(kind, name, func)
     destroy_registrar[kind] = destroy_registrar[kind] or {}
-    local registration = destroy_registrar[kind][name] or {}
+    local registration = destroy_registrar[kind][name or ""] or {}
     registration[#registration+1] = func
-    destroy_registrar[kind][name] = registration
+    destroy_registrar[kind][name or ""] = registration
     
     for _, f in pairs(destroy_filter) do
-        if f.filter == kind and f.name == name then
+        if f.filter == kind and (f.name and f.name == name) then
             return
         end
     end

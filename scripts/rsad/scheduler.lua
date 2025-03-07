@@ -1,8 +1,19 @@
 require("scripts.rsad.station")
+require("scripts.rsad.util")
 
 ---@type flib_queue
 queue = require("__flib__.queue")
 -- TODO: Expand to inter-yard deliveries
+
+---@class ScriptedTrainDestination
+---@field public train LuaTrain
+---@field public stop_distance number
+---@field public brake_force number
+---@field public stopping boolean
+---@field public decel number?
+---@field public is_forward boolean
+---@field public decouple_at LuaEntity
+---@field public decouple_dir defines.rail_direction
 
 ---@class PendingChange
 ---@field public station RSADStation
@@ -10,6 +21,8 @@ queue = require("__flib__.queue")
 
 ---@class scheduler
 scheduler = {
+    controller = nil, --[[@type rsad_controller]]
+    scripted_trains = {}, --[[@type table<uint, ScriptedTrainDestination>]]
     pending_changes = queue.new() --[[@type flib.Queue<PendingChange>]]
 }
 
@@ -40,11 +53,10 @@ local function default_target_record(target_station, reversed)
     }
 end
 
----@param controller rsad_controller
 ---@param station RSADStation
 ---@return boolean
-local function station_is_pending(controller, station)
-    for change in queue.iter(controller.scheduler.pending_changes) do
+local function station_is_pending(self, station)
+    for change in queue.iter(self.controller.scheduler.pending_changes) do
         if change.station.unit_number == station.unit_number then 
             return true
         end 
@@ -116,7 +128,7 @@ function scheduler.queue_station_request(self, controller, station)
     if (not data.item or not yard[rsad_station_type.import] or 
         yard[rsad_station_type.import][data.item.name] == nil or 
         next(yard[rsad_station_type.import][data.item.name]) == nil) or
-       (next(yard.shunter_trains) == nil) or station_is_pending(controller, station) then
+       (next(yard.shunter_trains) == nil) or station_is_pending(self, station) then
        return false --Failed to queue request, no Error 
     end
 
@@ -133,37 +145,35 @@ end
 
 ---@param self scheduler
 ---@param station RSADStation
----@param controller rsad_controller
 ---@return boolean, uint? --- Whether or not the request was successful, error number (nil if successful) 
-function scheduler.queue_shunt_wagon_to_empty(self, controller, station)
+function scheduler.queue_shunt_wagon_to_empty(self, station)
 
 end
 
 ---@param self scheduler
 ---@param train LuaTrain
----@param old_state defines.train_state
 ---@param return_depot RSADStation?
-function scheduler.manage_train_state_change(self, train, old_state, return_depot)
+function scheduler.check_and_return_shunter(self, train, return_depot)
     local schedule = train.schedule
     if train.state == defines.train_state.wait_station and schedule and schedule.current == #schedule.records and return_depot then
         local records = {
             [1] = default_target_record(return_depot, false)
         }
         train.schedule = {current = 1, records = records}
+        train.manual_mode = false
     end
 end
 
 ---@param self scheduler
----@param controller rsad_controller
 ---@return boolean ---False if no update was necessary. True if an update was processed
-function scheduler.tick(self, controller)
+function scheduler.update(self)
     ::tick_loop::
     local change = queue.pop_front(self.pending_changes)
     if not change then return false end
 
     local data_scuccess, station_entity, station_data = get_station_data(change.station)
     if not data_scuccess or not station_entity or not station_data or not station_data.network then goto tick_loop end
-    local yard = controller:get_train_yard_or_nil(station_data.network)
+    local yard = self.controller:get_train_yard_or_nil(station_data.network)
     if not yard then goto tick_loop end
 
     ---Try to create schedule
@@ -199,6 +209,107 @@ function scheduler.tick(self, controller)
     end
 
     return false
+end
+
+---@param path LuaRailPath
+---@param brake_force number
+---@param speed number --Train Speed
+---@param destination number --Destination travelled_distance
+---@return number force
+local function calculate_brake_force(path, brake_force, speed, destination)
+    local brake_distance = speed * speed / brake_force * 0.5
+    local brake_start = destination - brake_distance
+    local dist_to_start = (brake_start - path.travelled_distance)
+    local decel = (dist_to_start <= 0.1) and math.max(0, brake_force - (dist_to_start * 0.01)) or 0 
+
+    return decel
+end
+
+---@param self scheduler
+---@param data ScriptedTrainDestination
+function scheduler.on_scripted_stop(self, data)
+    self.controller:decouple_at(data.train, data.decouple_at, data.decouple_dir)
+end
+
+---@param self scheduler
+---@return boolean --false if no update is needed
+function scheduler.process_script_movement(self)
+    local stopped_trains = {}
+    local updated = false
+    for id, data in pairs(self.scripted_trains) do
+        updated = true
+        local path = data.train.path
+        local speed = data.train.speed
+        if path then
+            data.is_forward = path.is_front
+            local eff_brake = data.brake_force / data.train.weight
+            local decel = calculate_brake_force(path, eff_brake, speed, data.stop_distance)
+            if decel > (eff_brake * 0.75) then
+                decel = decel * (data.is_forward and 1 or -1) 
+                data.stopping = true
+                data.decel = decel
+                data.train.manual_mode = true
+                speed = speed - decel
+            end
+        elseif data.stopping and data.decel then
+            speed = speed - data.decel
+        end
+        if data.stopping and ((speed * (data.is_forward and 1 or -1)) <= 0.0001) then
+            speed = 0
+            stopped_trains[id] = data
+        end
+        data.train.speed = speed
+        ::continue::
+    end
+
+    for id, data in pairs(stopped_trains) do
+        self.scripted_trains[id] = nil
+        self:on_scripted_stop(data)
+    end
+
+    return updated
+end
+
+---@param self scheduler
+---@return boolean --false if no more needed
+function scheduler.on_tick(self)
+    return self:process_script_movement()
+end
+
+---comment
+---@param self scheduler
+---@param train LuaTrain
+---@param move_from LuaEntity --Carriage that marks the destination for [count away] trains
+---@param count uint --Number of carriages to move. If negative will count in reverse
+function scheduler.move_train_by_wagon_count(self, train, move_from, count)
+    local brake_force = 0.0
+    local brake_multiplier = nil
+    for _, l in pairs(train.carriages) do
+        brake_multiplier = 1.0 + l.force.train_braking_force_bonus
+        brake_force = brake_force + l.prototype.braking_force
+    end
+    brake_force = brake_force * (brake_multiplier or 1.0)
+    local stop_distance = 0.0
+    
+    local direction = ((count < 0 and defines.rail_direction.back) or defines.rail_direction.front)
+    local carriage = move_from --[[@type LuaEntity?]]
+    local next_carriage = carriage --[[@type LuaEntity?]]
+    count = math.abs(count)
+    for i = 1, count, 1 do
+        carriage = next_carriage
+        next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
+        if not next_carriage then return end
+        local distance = carriage and carriage.prototype.joint_distance + carriage.prototype.connection_distance or 0
+        stop_distance = stop_distance + distance and distance or 0.0
+    end
+    next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
+    stop_distance = stop_distance + (next_carriage and ((next_carriage.prototype.joint_distance / 2)) or 0.0)
+
+    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, is_forward = true, decouple_at = carriage, decouple_dir = direction} --[[@type ScriptedTrainDestination]]
+
+    self.scripted_trains[train.id] = train_data
+
+    self.controller:trigger_tick()
 end
 
 return scheduler

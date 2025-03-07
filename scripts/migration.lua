@@ -5,6 +5,9 @@ local version_migrations = {
   ["0.0.2"] = function()
     rsad_controller:__init()
     rsad_controller:__load()
+  end,
+  ["0.0.3"] = function()
+    storage.needs_tick = false
   end
 }
 

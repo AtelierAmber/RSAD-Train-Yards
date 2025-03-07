@@ -31,3 +31,9 @@ function signal_hash(signal)
     if signal_type == "virtual" then signal_type = "virtual-signal" end
     return (signal_type and (signal and signal.name) and (signal_type .. "-name".. "." .. signal.name))
 end
+
+---@param p1 MapPosition
+---@param p2 MapPosition
+function position_distance(p1, p2)
+    return math.sqrt((p2.x - p1.x)^2 + (p2.y-p1.y)^2)
+end

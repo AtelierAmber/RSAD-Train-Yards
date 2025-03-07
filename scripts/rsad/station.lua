@@ -44,7 +44,7 @@ end
 ---@param station RSADStation
 ---@return boolean success, LuaEntity? station_entity, StationData? data
 function get_station_data(station)
-    local station_entity = game.get_entity_by_unit_number(station.unit_number)
+    local station_entity = station and game.get_entity_by_unit_number(station.unit_number)
     if not station_entity or not station_entity.valid then return false end
 
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]

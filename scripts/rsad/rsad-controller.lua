@@ -14,30 +14,33 @@ local next = next -- Assign local table next for indexing speed
 rsad_controller = {
     stations = nil, --[[@type table<uint, RSADStation>]]
     train_yards = nil, --[[@type table<string, TrainYard>]]
-    scheduler = scheduler --[[@type scheduler]]
+    scheduler = scheduler, --[[@type scheduler]]
 }
+rsad_controller.scheduler.controller = rsad_controller
 
 ---@param self rsad_controller
 function rsad_controller.__init(self)
-    storage.stations = {} --[[@type table<uint, RSADStation>]]
-    --storage.shunter_trains = {} --[[@type table<string, table<uint, ShuntingData>>}]]
-    storage.train_yards = {} --[[@type table<string, TrainYard>]]
+    if not storage.stations then storage.stations = {} end
     self.stations = storage.stations
-    self.train_yards = storage.train_yards
+    if not storage.train_yards then storage.train_yards = {} end
+    self.train_yards = storage.train_yards or {}
+    storage.needs_tick = storage.needs_tick or false
+    if not storage.scripted_trains then storage.scripted_trains = {} end
+    self.scheduler.scripted_trains = storage.scripted_trains or {}
 end
 
 ---@param self rsad_controller
 function rsad_controller.__load(self)
-    --- Create train yards
-    self.stations = storage.stations
-    self.train_yards = storage.train_yards
+    self.stations = storage.stations or {}
+    self.train_yards = storage.train_yards or {}
+    self.scheduler.scripted_trains = storage.scripted_trains or {}
 end
 
 ---@param self rsad_controller
 ---@param tick_data NthTickEventData
-function rsad_controller.__tick(self, tick_data)
+function rsad_controller.__nth_tick(self, tick_data)
     --- Check first if any shunting orders need to be issued
-    if self.scheduler:tick(self) then end
+    if self.scheduler:update() then end
 
     ---@type TrainYard?
     local yard
@@ -46,7 +49,7 @@ function rsad_controller.__tick(self, tick_data)
     while active_yard ~= nil do
         yard = self.train_yards[active_yard]
         if yard then
-            if yard:tick(self) then break end
+            if yard:update(self) then break end
         end
         ---@diagnostic disable-next-line: unbalanced-assignments
         k, yard = next(self.train_yards, active_yard)
@@ -59,21 +62,22 @@ end
 ---@param train LuaTrain
 ---@param old_state defines.train_state
 function rsad_controller.__on_train_state_change(self, train, old_state)
-    local station = train.station and self.stations[train.station.unit_number]
-    if not station then return end
-    local success, station_entity, data = get_station_data(station)
-    if not success or not data then return end
-    local yard = self:get_train_yard_or_nil(data.network)
-    if yard then
-        if train.state == defines.train_state.wait_station and data.type == rsad_station_type.shunting_depot then
-            self:assign_shunter(train, yard)
+    if train.state == defines.train_state.wait_station then
+        local station = train.station and self.stations[train.station.unit_number]
+        if not station then 
+            ---Check for rail stop
+            local schedule = train.schedule
+            local record = schedule and schedule.records[schedule.current]
+            local rail = record and record.rail
+            if not record or not rail then return end
+            local stop = rail and rail.get_rail_segment_stop(defines.rail_direction.front)
+            if stop then 
+                station = self.stations[stop.unit_number]
+            else return end
         end
-
-        self.scheduler:manage_train_state_change(train, old_state, select(2, next(yard[rsad_station_type.shunting_depot])))
+        self:__on_arrive_at_station(station, train, old_state)
     end
 end
-
---- TODO: ON TRAIN DESTROY
 
 ---@param self rsad_controller
 ---@param entity LuaEntity
@@ -107,6 +111,17 @@ function rsad_controller.__on_station_built(self, entity)
     return true
 end
 
+---@param self rsad_controller
+---@param train LuaTrain?
+---@return boolean
+function rsad_controller.__on_train_removed(self, train)
+    if not train then return true end
+
+    self:remove_shunter(train.id)
+
+    return true
+end
+
 ---@param entity LuaEntity
 function rsad_controller.__on_paste_settings(self, entity)
     if entity.name == "entity-ghost" or entity.name ~= names.entities.rsad_station then return end
@@ -121,20 +136,27 @@ function rsad_controller.__on_paste_settings(self, entity)
     end
 end
 
+function rsad_controller.__main_tick(self)
+    storage.needs_tick = self.scheduler:on_tick()
+    if not storage.needs_tick then script.on_event(defines.events.on_tick, nil) end --Unregister to save UPS
+end
+
 ---@param self rsad_controller
 function rsad_controller.register_events(self)
    events.register_init(function() self:__init() end)
    events.register_load(function() self:__load() end)
    events.register_break("name", names.entities.rsad_station, function(entity) return self:__on_station_destroyed(entity) end)
+   events.register_break("rolling-stock", nil, function(entity) return self:__on_train_removed(entity.train) end)
    events.register_build("name", names.entities.rsad_station, function(entity) return self:__on_station_built(entity) end)
    events.register_paste(function(entity) self:__on_paste_settings(entity) end )
    events.register_train_handler(defines.events.on_train_changed_state, function(data) self:__on_train_state_change(data.train, data.old_state) end)
-   script.on_nth_tick(ticks_per_update, function(tick_data) self:__tick(tick_data) end)
+   script.on_nth_tick(ticks_per_update, function(tick_data) self:__nth_tick(tick_data) end)
+   if storage.needs_tick then script.on_event(defines.events.on_tick, function(tick_data) self:__main_tick() end) end
    script.on_event(defines.events.on_player_created, function(data) self:__load() end)
 end
 
 ---@param self rsad_controller
----@param signal SignalID
+---@param signal SignalID?
 ---@return TrainYard?
 function rsad_controller.get_train_yard_or_nil(self, signal)
     local hash = signal_hash(signal)
@@ -143,9 +165,10 @@ end
 
 ---Get or creates a train yard with specified signal
 ---@param self rsad_controller
----@param signal SignalID
+---@param signal SignalID?
 ---@return TrainYard? yard
 function rsad_controller.get_or_create_train_yard(self, signal)
+    if not signal then return nil end
     local hash = signal_hash(signal)
     if not hash then return nil end
     self.train_yards[hash] = self.train_yards[hash] or create_train_yard(signal)
@@ -233,10 +256,46 @@ end
 
 ---comment
 ---@param self rsad_controller
----@param train LuaTrain
+---@param train_id integer
 ---@param yard TrainYard
-function rsad_controller.assign_shunter(self, train, yard)
-    yard:add_new_shunter(train)
+function rsad_controller.assign_shunter(self, train_id, yard)
+    yard:add_new_shunter(train_id)
 end
 
+---comment
+---@param self rsad_controller
+---@param train_id integer
+function rsad_controller.remove_shunter(self, train_id)
+    for _, yard in pairs(self.train_yards) do
+        yard:remove_shunter(train_id)
+    end
+end
+
+---@param self rsad_controller
+---@param station RSADStation
+---@param train LuaTrain
+---@param old_state defines.train_state
+function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
+    local success, station_entity, data = get_station_data(station)
+    if not success or not data then return end
+    local yard = self:get_train_yard_or_nil(data.network)
+    if yard then
+        if data.type == rsad_station_type.shunting_depot then
+            self:assign_shunter(train.id, yard)
+        else
+            self.scheduler:check_and_return_shunter(train, select(2, next(yard[rsad_station_type.shunting_depot])))
+            if data.type == rsad_station_type.import then
+                self:attempt_couple_at_station(train, station, 1)
+            end
+        end
+
+    end
+end
+
+function rsad_controller.trigger_tick(self)
+    storage.needs_tick = true
+    script.on_event(defines.events.on_tick, function(tick_data) self:__main_tick() end)
+end
+
+require("scripts.rsad.coupling") --Coupling Module added to rsad_controller
 return rsad_controller
