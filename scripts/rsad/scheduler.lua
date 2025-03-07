@@ -14,6 +14,7 @@ queue = require("__flib__.queue")
 ---@field public is_forward boolean
 ---@field public decouple_at LuaEntity
 ---@field public decouple_dir defines.rail_direction
+---@field public network string
 
 ---@class PendingChange
 ---@field public station RSADStation
@@ -228,7 +229,7 @@ end
 ---@param self scheduler
 ---@param data ScriptedTrainDestination
 function scheduler.on_scripted_stop(self, data)
-    self.controller:decouple_at(data.train, data.decouple_at, data.decouple_dir)
+    self.controller:decouple_at(data.train, data.decouple_at, data.decouple_dir, data.network)
 end
 
 ---@param self scheduler
@@ -281,7 +282,8 @@ end
 ---@param train LuaTrain
 ---@param move_from LuaEntity --Carriage that marks the destination for [count away] trains
 ---@param count uint --Number of carriages to move. If negative will count in reverse
-function scheduler.move_train_by_wagon_count(self, train, move_from, count)
+---@param network string --Network this train is assigned in
+function scheduler.move_train_by_wagon_count(self, train, move_from, count, network)
     local brake_force = 0.0
     local brake_multiplier = nil
     for _, l in pairs(train.carriages) do
@@ -305,7 +307,7 @@ function scheduler.move_train_by_wagon_count(self, train, move_from, count)
     next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
     stop_distance = stop_distance + (next_carriage and ((next_carriage.prototype.joint_distance / 2)) or 0.0)
 
-    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, is_forward = true, decouple_at = carriage, decouple_dir = direction} --[[@type ScriptedTrainDestination]]
+    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, is_forward = true, decouple_at = carriage, decouple_dir = direction, network = network} --[[@type ScriptedTrainDestination]]
 
     self.scripted_trains[train.id] = train_data
 

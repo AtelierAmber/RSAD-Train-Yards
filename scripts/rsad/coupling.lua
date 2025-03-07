@@ -35,7 +35,7 @@ function rsad_controller.attempt_couple_at_station(self, train, station, count)
     if count and (old_train_length + count) < table_size(train.carriages) then
         local connected_stock = front_stock.get_connected_rolling_stock(connect_dir)
         if not connected_stock then return false end
-        self.scheduler:move_train_by_wagon_count(train, connected_stock, count * ((connected_stock.is_headed_to_trains_front and -1) or 1))
+        self.scheduler:move_train_by_wagon_count(train, connected_stock, count * ((connected_stock.is_headed_to_trains_front and -1) or 1), signal_hash(station_data.network) or "")
     end
 
     local new_train_id = train.id
@@ -52,13 +52,17 @@ end
 ---@param train LuaTrain
 ---@param at LuaEntity
 ---@param direction defines.rail_direction
-function rsad_controller.decouple_at(self, train, at, direction)
+---@param network string
+function rsad_controller.decouple_at(self, train, at, direction, network)
     local old_train_id = train.id
     local schedule = train.schedule
-    local s = at.get_connected_rolling_stock(direction)
-    local b = at.disconnect_rolling_stock(direction)
+    at.disconnect_rolling_stock(direction)
     local new_train_id = at.train.id
-    --TODO FIX SHUNTER ASSIGNMENT
     at.train.schedule = schedule
     at.train.manual_mode = false
+
+    local yard = self.train_yards[network]
+    if not yard then return end
+
+    yard:redefine_shunter(old_train_id, new_train_id)
 end
