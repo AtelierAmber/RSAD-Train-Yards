@@ -80,7 +80,7 @@ end
 ---@param new_id integer
 local function redefine_shunter(self, old_id, new_id)
     local old = self.shunter_trains[old_id]
-    if not old then self:add_new_shunter(new_id) return end
+    if not old then return end
     self.shunter_trains[new_id] = old
     self.shunter_trains[old_id] = nil
 end
