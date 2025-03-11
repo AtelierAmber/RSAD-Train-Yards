@@ -2,6 +2,7 @@ local rsad_controller = rsad_controller --- Find Global rsad_controller
 assert(rsad_controller ~= nil)
 
 flib_gui = require("__flib__.gui")
+flib_math = require("__flib__.math")
 require("prototypes.names")
 require("scripts.defines")
 require("scripts.rsad.util")
@@ -20,6 +21,8 @@ STATUS_SPRITES[defines.entity_status.disabled_by_script] = RED
 STATUS_SPRITES[defines.entity_status.marked_for_deconstruction] = RED
 local STATUS_SPRITES_DEFAULT = RED
 local STATUS_SPRITES_GHOST = YELLOW
+
+local max_train_limit = settings.startup["rsad-station-max-train-limit"].value
 
 ---@param e EventData.on_gui_click
 function handle_close(e)
@@ -193,11 +196,294 @@ function handle_reversed(e)
     control.circuit_condition = circuit
 end
 
+---@param e EventData.on_gui_value_changed|EventData.on_gui_text_changed
+function handle_train_limit(e)
+    local element = e.element
+	if not element then return end
+    local unit_number = element.tags.id --[[@as uint]]
+	local entity = game.get_entity_by_unit_number(unit_number)
+	if not entity or not entity.valid then return end
+
+    if element.type == "slider" then
+        local value = flib_math.clamp(element.slider_value, 1, max_train_limit)
+        entity.trains_limit = value
+        local player = game.get_player(e.player_index)
+        if not player then return end
+        player.opened.frame.vflow_main.vflow_train_limit.train_limit.number_field.text = tostring(entity.trains_limit)
+    else
+        local value = flib_math.clamp(tonumber(element.text), 1, max_train_limit)
+        entity.trains_limit =  value
+        element.text = tostring(value)
+        local player = game.get_player(e.player_index)
+        if not player then return end
+        player.opened.frame.vflow_main.vflow_train_limit.train_limit.slider_collection.slider.slider_value = entity.trains_limit
+    end
+end
+
+local status_gui = {
+    type = "flow",
+    style = "flib_titlebar_flow",
+    direction = "horizontal",
+    style_mods = {
+        vertical_align = "center",
+        horizontally_stretchable = true,
+        bottom_padding = 4,
+    },
+    children = {
+        {
+            type = "sprite",
+            sprite = STATUS_SPRITES[defines.entity_status.normal] or STATUS_SPRITES_DEFAULT,
+            style = "status_image",
+            style_mods = { stretch_image_to_widget_size = true },
+        },
+        {
+            type = "label",
+            caption = { "rsad-gui.status" }
+        },
+    },
+}
+
+local preview_gui = {
+    type = "frame",
+    name = "preview_frame",
+    style = "deep_frame_in_shallow_frame",
+    style_mods = {
+        minimal_width = 0,
+        horizontally_stretchable = true,
+        padding = 0,
+    },
+    children = {
+        { type = "entity-preview", name = "preview", style = "wide_entity_button" },
+    },
+}
+
+local type_gui_label = {
+    type = "label",
+    style = "heading_2_label",
+    caption = { "rsad-gui.station-type" },
+    style_mods = { top_padding = 8 }
+}
+---@param entity LuaEntity
+local function type_gui_drop_down(entity, selected_index) return {
+    type = "flow",
+    name = "top",
+    direction = "horizontal",
+    style_mods = { vertical_align = "center" },
+    children = {
+        {
+            type = "drop-down",
+            style_mods = { top_padding = 3, right_margin = 8 },
+            handler = handle_type_drop_down,
+            tags = { id = entity.unit_number },
+            selected_index = selected_index,
+            items = {
+                { "rsad-gui.station-types.station-0" },
+                { "rsad-gui.station-types.station-1" },
+                { "rsad-gui.station-types.station-2" },
+                { "rsad-gui.station-types.station-3" },
+                { "rsad-gui.station-types.station-4" },
+                { "rsad-gui.station-types.station-5" },
+                { "rsad-gui.station-types.station-6" },
+            },
+        }
+    },
+} end
+---@param entity LuaEntity
+---@param reversed boolean
+local function shunting_switch(entity, reversed) return {
+    type = "flow",
+    name = "vflow_switch",
+    direction = "vertical",
+    style_mods = {horizontal_align = "left"},
+    children = {
+        {
+            type = "label",
+            name = "switch_label",
+            style = "heading_2_label",
+            caption = {"rsad-gui.shunting-direction-switch"},
+            style_mods = {top_padding = 8}
+        },
+        {
+            type = "switch",
+            name = "shunting_direction_switch",
+            left_label_caption = {"rsad-gui.shunting-direction-switch-left"},
+            left_label_tooltip = {"rsad-gui.shunting-direction-switch-left-tooltip"},
+            right_label_caption = {"rsad-gui.shunting-direction-switch-right"},
+            right_label_tooltip = {"rsad-gui.shunting-direction-switch-right-tooltip"},
+            allow_none_state = false,
+            switch_state = reversed and "right" or "left",
+            handler = handle_reversed,
+            tags = { id = entity.unit_number },
+        }
+    }
+} end
+---@param entity LuaEntity
+---@param subtype integer
+local function subtype_drop_down(entity, subtype) return {
+    type = "flow",
+    name = "vflow_subtype",
+    direction = "vertical",
+    style_mods = {horizontal_align = "center"},
+    children = {
+        { type = "line", style_mods = { top_padding = 10 } },
+        {
+            type = "flow",
+            name = "turnabout_type",
+            direction = "vertical",
+            style_mods = {horizontal_align = "left"},
+            children = {
+                {
+                    type = "label",
+                    style = "heading_2_label",
+                    caption = { "rsad-gui.station-turnabout" }
+                },
+                {
+                    type = "drop-down",
+                    style_mods = { top_padding = 3, right_margin = 8 },
+                    handler = handle_turnabout_drop_down,
+                    tags = { id = entity.unit_number },
+                    selected_index = subtype,
+                    items = {
+                        { "rsad-gui.turnabout-phase.phase-1" },
+                        { "rsad-gui.turnabout-phase.phase-2" },
+                        { "rsad-gui.turnabout-phase.phase-3" },
+                    },
+                }
+            }
+        }
+    }
+} end
+---@param entity LuaEntity
+local function train_limit_bar(entity) return {
+    type = "flow",
+    name = "vflow_train_limit",
+    direction = "vertical",
+    style_mods = {horizontal_align = "left"},
+    children = {
+        { type = "line", style_mods = { top_padding = 10, bottom_padding = 1 } },
+        {
+            type = "flow",
+            name = "train_limit",
+            direction = "horizontal",
+            style_mods = {vertical_align = "center"},
+            children = {
+                {
+                    type = "flow",
+                    name = "slider_collection",
+                    direction = "vertical",
+                    style_mods = {horizontal_align = "left"},
+                    children = {
+                        {
+                            type = "label",
+                            style = "heading_2_label",
+                            caption = { "rsad-gui.station-train-limit" }
+                        },
+                        {
+                            type = "slider",
+                            style = "notched_slider",
+                            name = "slider",
+                            style_mods = {horizontal_align = "left"},
+                            handler = handle_train_limit,
+                            tags = { id = entity.unit_number },
+                            value = entity.trains_limit,
+                            minimum_value = 1,
+                            maximum_value = max_train_limit
+                        }
+                    }
+                },
+                {
+                    type = "textfield",
+                    name = "number_field",
+                    style_mods = {vertical_align = "center"},
+                    handler = handle_train_limit,
+                    tags = { id = entity.unit_number },
+                    text = tostring(entity.trains_limit),
+                    numeric = true
+                }
+            }
+        }
+    }
+} end
+---@param entity LuaEntity
+---@param network SignalID?
+local function network_selection(entity, network) return {
+    type = "flow",
+    name = "vflow_network",
+    direction = "vertical",
+    style_mods = {horizontal_align = "center"},
+    children = {
+        {
+            type = "label",
+            name = "network_label",
+            style = "heading_2_label",
+            caption = { "rsad-gui.network" },
+            style_mods = { top_padding = 8 },
+        },
+        {
+            type = "flow",
+            name = "bottom",
+            direction = "horizontal",
+            style_mods = { vertical_align = "top" },
+            children = {
+                {
+                    type = "choose-elem-button",
+                    name = "network",
+                    style = "slot_button_in_shallow_frame",
+                    elem_type = "signal",
+                    tooltip = { "rsad-gui.network-tooltip" },
+                    signal = network,
+                    style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                    handler = handle_network,
+                    tags = { id = entity.unit_number },
+                },
+            },
+        }
+    }
+} end
+---@param entity LuaEntity
+---@param item SignalID?
+local function item_selection(entity, item) return {
+    type = "flow",
+    name = "vflow_item",
+    direction = "vertical",
+    style_mods = {horizontal_align = "center"},
+    children = {
+        {
+            type = "label",
+            name = "item_label",
+            style = "heading_2_label",
+            caption = { "rsad-gui.item" },
+            style_mods = { top_padding = 8 },
+        },
+        {
+            type = "flow",
+            name = "bottom",
+            direction = "horizontal",
+            style_mods = { vertical_align = "top" },
+            children = {
+                {
+                    type = "choose-elem-button",
+                    name = "item",
+                    style = "slot_button_in_shallow_frame",
+                    elem_type = "item",
+                    tooltip = { "rsad-gui.item-tooltip" },
+                    item = (item and item.name),
+                    style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                    handler = handle_item,
+                    tags = { id = entity.unit_number },
+                },
+            },
+        }
+    }
+} end
+
 ---@param entity LuaEntity
 ---@param player LuaPlayer
+---@param selected_index integer
 ---@param network SignalID?
 ---@param item SignalID?
 ---@param reversed boolean
+---@param subtype integer
 ---@return flib.GuiElemDef
 function station_gui(entity, player, selected_index, network, item, reversed, subtype) return {
     type = "frame",
@@ -241,138 +527,20 @@ function station_gui(entity, player, selected_index, network, item, reversed, su
                 style_mods = { horizontal_align = "left" },
                 children = {
                     --status
-                    {
-                        type = "flow",
-                        style = "flib_titlebar_flow",
-                        direction = "horizontal",
-                        style_mods = {
-                            vertical_align = "center",
-                            horizontally_stretchable = true,
-                            bottom_padding = 4,
-                        },
-                        children = {
-                            {
-                                type = "sprite",
-                                sprite = STATUS_SPRITES[defines.entity_status.normal] or STATUS_SPRITES_DEFAULT,
-                                style = "status_image",
-                                style_mods = { stretch_image_to_widget_size = true },
-                            },
-                            {
-                                type = "label",
-                                caption = { "rsad-gui.status" }
-                            },
-                        },
-                    },
+                    status_gui,
                     --preview
-                    {
-                        type = "frame",
-                        name = "preview_frame",
-                        style = "deep_frame_in_shallow_frame",
-                        style_mods = {
-                            minimal_width = 0,
-                            horizontally_stretchable = true,
-                            padding = 0,
-                        },
-                        children = {
-                            { type = "entity-preview", name = "preview", style = "wide_entity_button" },
-                        },
-                    },
+                    preview_gui,
                     --Type drop down
-                    {
-                        type = "label",
-                        style = "heading_2_label",
-                        caption = { "rsad-gui.station-type" },
-                        style_mods = { top_padding = 8 }
-                    },
-                    {
-                        type = "flow",
-                        name = "top",
-                        direction = "horizontal",
-                        style_mods = { vertical_align = "center" },
-                        children = {
-                            {
-                                type = "drop-down",
-                                style_mods = { top_padding = 3, right_margin = 8 },
-                                handler = handle_type_drop_down,
-                                tags = { id = entity.unit_number },
-                                selected_index = selected_index,
-                                items = {
-                                    { "rsad-gui.station-types.station-0" },
-                                    { "rsad-gui.station-types.station-1" },
-                                    { "rsad-gui.station-types.station-2" },
-                                    { "rsad-gui.station-types.station-3" },
-                                    { "rsad-gui.station-types.station-4" },
-                                    { "rsad-gui.station-types.station-5" },
-                                    { "rsad-gui.station-types.station-6" },
-                                },
-                            }
-                        },
-                    },
-                    ---Reversed Shunting switch
+                    type_gui_label,
+                    type_gui_drop_down(entity, selected_index),
                     { type = "line", style_mods = { top_padding = 10 } },
-                    {
-                        type = "flow",
-                        name = "vflow_switch",
-                        direction = "vertical",
-                        style_mods = {horizontal_align = "left"},
-                        children = {
-                            {
-                                type = "label",
-                                name = "switch_label",
-                                style = "heading_2_label",
-                                caption = {"rsad-gui.shunting-direction-switch"},
-                                style_mods = {top_padding = 8}
-                            },
-                            {
-                                type = "switch",
-                                name = "shunting_direction_switch",
-                                left_label_caption = {"rsad-gui.shunting-direction-switch-left"},
-                                left_label_tooltip = {"rsad-gui.shunting-direction-switch-left-tooltip"},
-                                right_label_caption = {"rsad-gui.shunting-direction-switch-right"},
-                                right_label_tooltip = {"rsad-gui.shunting-direction-switch-right-tooltip"},
-                                allow_none_state = false,
-                                switch_state = reversed and "right" or "left",
-                                handler = handle_reversed,
-                                tags = { id = entity.unit_number },
-                            }
-                        }
-                    },
+                    ---Reversed Shunting switch
+                    shunting_switch(entity, reversed),
                     ---Subtype section
-                    {
-                        type = "flow",
-                        name = "vflow_subtype",
-                        direction = "vertical",
-                        style_mods = {horizontal_align = "center"},
-                        children = {
-                            { type = "line", style_mods = { top_padding = 10 } },
-                            {
-                                type = "flow",
-                                name = "turnabout_type",
-                                direction = "vertical",
-                                style_mods = {horizontal_align = "left"},
-                                children = {
-                                    {
-                                        type = "label",
-                                        style = "heading_2_label",
-                                        caption = { "rsad-gui.station-turnabout" }
-                                    },
-                                    {
-                                        type = "drop-down",
-                                        style_mods = { top_padding = 3, right_margin = 8 },
-                                        handler = handle_turnabout_drop_down,
-                                        tags = { id = entity.unit_number },
-                                        selected_index = subtype,
-                                        items = {
-                                            { "rsad-gui.turnabout-phase.phase-1" },
-                                            { "rsad-gui.turnabout-phase.phase-2" },
-                                            { "rsad-gui.turnabout-phase.phase-3" },
-                                        },
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    ---Settings section for network
+                    subtype_drop_down(entity, subtype),
+                    ---Train Limit slider
+                    train_limit_bar(entity),
+                    ---Network and Item
                     { type = "line", style_mods = { top_padding = 10 } },
                     {
                         type = "flow",
@@ -381,76 +549,10 @@ function station_gui(entity, player, selected_index, network, item, reversed, su
                         style_mods = {horizontal_align = "center", vertical_align = "center"},
                         children = {
                             --Network
-                            {
-                                type = "flow",
-                                name = "vflow_network",
-                                direction = "vertical",
-                                style_mods = {horizontal_align = "center"},
-                                children = {
-                                    {
-                                        type = "label",
-                                        name = "network_label",
-                                        style = "heading_2_label",
-                                        caption = { "rsad-gui.network" },
-                                        style_mods = { top_padding = 8 },
-                                    },
-                                    {
-                                        type = "flow",
-                                        name = "bottom",
-                                        direction = "horizontal",
-                                        style_mods = { vertical_align = "top" },
-                                        children = {
-                                            {
-                                                type = "choose-elem-button",
-                                                name = "network",
-                                                style = "slot_button_in_shallow_frame",
-                                                elem_type = "signal",
-                                                tooltip = { "rsad-gui.network-tooltip" },
-                                                signal = network,
-                                                style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
-                                                handler = handle_network,
-                                                tags = { id = entity.unit_number },
-                                            },
-                                        },
-                                    }
-                                }
-                            },
+                            network_selection(entity, network),
                             { type = "line", direction = "vertical", style_mods = { top_padding = 10 } },
                             --Item
-                            {
-                                type = "flow",
-                                name = "vflow_item",
-                                direction = "vertical",
-                                style_mods = {horizontal_align = "center"},
-                                children = {
-                                    {
-                                        type = "label",
-                                        name = "item_label",
-                                        style = "heading_2_label",
-                                        caption = { "rsad-gui.item" },
-                                        style_mods = { top_padding = 8 },
-                                    },
-                                    {
-                                        type = "flow",
-                                        name = "bottom",
-                                        direction = "horizontal",
-                                        style_mods = { vertical_align = "top" },
-                                        children = {
-                                            {
-                                                type = "choose-elem-button",
-                                                name = "item",
-                                                style = "slot_button_in_shallow_frame",
-                                                elem_type = "item",
-                                                tooltip = { "rsad-gui.item-tooltip" },
-                                                item = (item and item.name),
-                                                style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
-                                                handler = handle_item,
-                                                tags = { id = entity.unit_number },
-                                            },
-                                        },
-                                    }
-                                }
-                            }
+                            item_selection(entity, item)
                         }
                     }
                 }

@@ -39,6 +39,7 @@ flib_gui.add_handlers({
 	["rsad-station-item"] = handle_item,
 	["rsad-station-shunting-direction"] = handle_reversed,
 	["rsad-station-turnabout"] = handle_turnabout_drop_down,
+	["rsad-station-train-limit"] = handle_train_limit,
 })
 flib_gui.handle_events()
 

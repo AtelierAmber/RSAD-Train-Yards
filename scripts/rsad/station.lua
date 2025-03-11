@@ -51,7 +51,7 @@ function get_station_data(station)
 
 ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.53
     local type, subtype, reversed = unpack_station_constant(control.circuit_condition.constant)
-    
+
     ---@type StationData
     local data = {
         type = type --[[@as rsad_station_type]],
@@ -112,7 +112,7 @@ end
 ---@param entity LuaEntity
 ---@return RSADStation station
 function create_rsad_station(entity)
-    entity.trains_limit = nil
+    entity.trains_limit = 1
     local station = {
         unit_number = entity.unit_number,
         assignments = 0,

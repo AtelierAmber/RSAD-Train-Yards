@@ -64,6 +64,7 @@ function rsad_controller.decouple_all_cargo(self, train, station, is_shunter)
 
     local wagon = start
     local next_wagon = start --[[@as LuaEntity?]]
+    if wagon.type == "locomotive" then return false end
     while true do
         next_wagon = wagon.get_connected_rolling_stock(direction)
         assert(next_wagon ~= nil, "Failed to decouple. No Locomotive found to decouple from.")
@@ -88,7 +89,7 @@ function rsad_controller.decouple_all_cargo(self, train, station, is_shunter)
     local success, entity, station_data = get_station_data(station)
     if not success or not entity or not station_data or not entity.valid then return false end
 
-    local yard = self.train_yards[station_data.network] --[[@type TrainYard]]
+    local yard = self.train_yards[signal_hash(station_data.network)] --[[@type TrainYard]]
     if not yard then return true, train end
 
     yard:redefine_shunter(old_train_id, new_train_id)

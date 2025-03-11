@@ -8,6 +8,14 @@ local version_migrations = {
   end,
   ["0.0.3"] = function()
     storage.needs_tick = false
+  end,
+  ["0.0.4"] = function()
+    for _, station in pairs(storage.stations) do
+      update_station_data(station, {train_limit = 1})
+      station.assignments = 0
+      ::continue::
+    end
+    rsad_controller:__load()
   end
 }
 

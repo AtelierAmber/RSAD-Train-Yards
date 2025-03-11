@@ -117,6 +117,10 @@ end
 function rsad_controller.__on_train_removed(self, train)
     if not train then return true end
 
+    for _, station in pairs(self.stations) do
+        if station.parked_train == train.id then station.parked_train = nil end
+    end
+
     self:remove_shunter(train.id)
 
     return true
@@ -306,6 +310,7 @@ function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
                     end
                     train = new_train
                     self.scheduler:check_and_return_shunter(train, select(2, next(yard[rsad_station_type.shunting_depot])))
+                    station.assignments = 0
                 end
             else
                 if data.type == rsad_station_type.import then
