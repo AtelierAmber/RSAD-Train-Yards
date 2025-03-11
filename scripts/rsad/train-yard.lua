@@ -150,7 +150,7 @@ local function update(self, controller)
                     end
                 end
             elseif not station.parked_train
-                   and (data_success and data and station.assignments < data.train_limit) then -- Check for already requested
+                   and (data_success and data and ((data.train_limit and station.assignments < data.train_limit) or station.assignments < 1)) then -- Check for already requested
 
                 local schedule_success, error = controller.scheduler:queue_station_request(controller, station)
                 if not schedule_success and error then

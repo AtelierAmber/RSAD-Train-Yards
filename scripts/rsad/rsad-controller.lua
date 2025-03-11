@@ -283,9 +283,39 @@ function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
         if data.type == rsad_station_type.shunting_depot then
             self:assign_shunter(train.id, yard)
         else
-            self.scheduler:check_and_return_shunter(train, select(2, next(yard[rsad_station_type.shunting_depot])))
-            if data.type == rsad_station_type.import then
-                self:attempt_couple_at_station(train, station, 1)
+            local train_data = yard.shunter_trains[train.id]
+            local is_shunter = train_data ~= nil
+            if is_shunter then
+                if data.type == rsad_station_type.import then
+                    if train_data.current_stage == rsad_shunting_stage.delivery then
+                        self:attempt_couple_at_station(train, station, 1)
+                    elseif train_data.current_stage == rsad_shunting_stage.sort_imports then
+                        local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
+                        if not decoupled or not new_train then
+                            game.print("Failed to decouple at " .. (train.front_stock and train.front_stock.gps_tag or "nil"))
+                            return
+                        end
+                        train = new_train
+                        ---TODO CONTINUE SORT
+                    end
+                elseif data.type == rsad_station_type.request then 
+                    local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
+                    if not decoupled or not new_train then
+                        game.print("Failed to decouple at " .. (train.front_stock and train.front_stock.gps_tag or "nil"))
+                        return
+                    end
+                    train = new_train
+                    self.scheduler:check_and_return_shunter(train, select(2, next(yard[rsad_station_type.shunting_depot])))
+                end
+            else
+                if data.type == rsad_station_type.import then
+                    local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
+                    if not decoupled or not new_train then
+                        game.print("Failed to decouple at " .. (train.front_stock and train.front_stock.gps_tag or "nil"))
+                        return
+                    end
+                    train = new_train
+                end
             end
         end
 

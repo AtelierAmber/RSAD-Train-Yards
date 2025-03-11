@@ -15,6 +15,7 @@ queue = require("__flib__.queue")
 ---@field public decouple_at LuaEntity
 ---@field public decouple_dir defines.rail_direction
 ---@field public network string
+---@field public station RSADStation
 
 ---@class PendingChange
 ---@field public station RSADStation
@@ -156,7 +157,7 @@ end
 ---@param return_depot RSADStation?
 function scheduler.check_and_return_shunter(self, train, return_depot)
     local schedule = train.schedule
-    if train.state == defines.train_state.wait_station and schedule and schedule.current == #schedule.records and return_depot then
+    if schedule and schedule.current == #schedule.records and return_depot then
         local records = {
             [1] = default_target_record(return_depot, false)
         }
@@ -229,7 +230,7 @@ end
 ---@param self scheduler
 ---@param data ScriptedTrainDestination
 function scheduler.on_scripted_stop(self, data)
-    self.controller:decouple_at(data.train, data.decouple_at, data.decouple_dir, data.network)
+    self.controller:decouple_at(data.train, data.decouple_at, data.decouple_dir, data.network, data.station)
 end
 
 ---@param self scheduler
@@ -283,7 +284,8 @@ end
 ---@param move_from LuaEntity --Carriage that marks the destination for [count away] trains
 ---@param count uint --Number of carriages to move. If negative will count in reverse
 ---@param network string --Network this train is assigned in
-function scheduler.move_train_by_wagon_count(self, train, move_from, count, network)
+---@param station RSADStation --Station to assign the decoupled train to
+function scheduler.move_train_by_wagon_count(self, train, move_from, count, network, station)
     local brake_force = 0.0
     local brake_multiplier = nil
     for _, l in pairs(train.carriages) do
@@ -307,7 +309,7 @@ function scheduler.move_train_by_wagon_count(self, train, move_from, count, netw
     next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
     stop_distance = stop_distance + (next_carriage and ((next_carriage.prototype.joint_distance / 2)) or 0.0)
 
-    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, is_forward = true, decouple_at = carriage, decouple_dir = direction, network = network} --[[@type ScriptedTrainDestination]]
+    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, is_forward = true, decouple_at = carriage, decouple_dir = direction, network = network, station = station} --[[@type ScriptedTrainDestination]]
 
     self.scripted_trains[train.id] = train_data
 

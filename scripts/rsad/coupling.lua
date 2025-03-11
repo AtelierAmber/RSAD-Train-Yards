@@ -11,6 +11,13 @@ local function get_front_stock(train, station_entity)
     return train.back_stock, defines.rail_direction.back
 end
 
+---@param train LuaTrain
+---@return LuaEntity entity, defines.rail_direction front_direction
+local function get_back_cargo(train)
+    local back = train.carriages[#train.carriages].type ~= "locomotive"
+    return (back and train.carriages[#train.carriages] or train.carriages[1]), (back and defines.rail_direction.front or defines.rail_direction.back)
+end
+
 ---@param self rsad_controller
 ---@param train LuaTrain
 ---@param station RSADStation
@@ -35,7 +42,7 @@ function rsad_controller.attempt_couple_at_station(self, train, station, count)
     if count and (old_train_length + count) < table_size(train.carriages) then
         local connected_stock = front_stock.get_connected_rolling_stock(connect_dir)
         if not connected_stock then return false end
-        self.scheduler:move_train_by_wagon_count(train, connected_stock, count * ((connected_stock.is_headed_to_trains_front and -1) or 1), signal_hash(station_data.network) or "")
+        self.scheduler:move_train_by_wagon_count(train, connected_stock, count * ((connected_stock.is_headed_to_trains_front and -1) or 1), signal_hash(station_data.network) or "", station)
     end
 
     local new_train_id = train.id
@@ -50,19 +57,67 @@ end
 
 ---@param self rsad_controller
 ---@param train LuaTrain
+---@param station RSADStation
+---@return boolean success, LuaTrain? new_train
+function rsad_controller.decouple_all_cargo(self, train, station, is_shunter)
+    local start, direction = get_back_cargo(train)
+
+    local wagon = start
+    local next_wagon = start --[[@as LuaEntity?]]
+    while true do
+        next_wagon = wagon.get_connected_rolling_stock(direction)
+        assert(next_wagon ~= nil, "Failed to decouple. No Locomotive found to decouple from.")
+        --[[@cast next_wagon LuaEntity]]
+        if next_wagon.type == "locomotive" then break end
+        wagon = next_wagon
+    end
+    
+    local old_train_id = train.id
+    local schedule = train.schedule --[[@as TrainSchedule]]
+    if not wagon.disconnect_rolling_stock(direction) then return false end
+    train = next_wagon.train --[[@as LuaTrain]]
+    local new_train_id = next_wagon.train.id or old_train_id
+    if schedule.current < #schedule.records then
+        schedule.current = schedule.current + 1
+    end
+    train.schedule = schedule
+    train.manual_mode = false
+
+    if not is_shunter then return false end
+
+    local success, entity, station_data = get_station_data(station)
+    if not success or not entity or not station_data or not entity.valid then return false end
+
+    local yard = self.train_yards[station_data.network] --[[@type TrainYard]]
+    if not yard then return true, train end
+
+    yard:redefine_shunter(old_train_id, new_train_id)
+    station.parked_train = wagon.train.id
+
+    return true, train
+end
+
+---@param self rsad_controller
+---@param train LuaTrain
 ---@param at LuaEntity
 ---@param direction defines.rail_direction
 ---@param network string
-function rsad_controller.decouple_at(self, train, at, direction, network)
+---@param assign_to RSADStation
+function rsad_controller.decouple_at(self, train, at, direction, network, assign_to)
     local old_train_id = train.id
     local schedule = train.schedule
-    at.disconnect_rolling_stock(direction)
-    local new_train_id = at.train.id
-    at.train.schedule = schedule
-    at.train.manual_mode = false
-
-    local yard = self.train_yards[network]
-    if not yard then return end
-
-    yard:redefine_shunter(old_train_id, new_train_id)
+    local other = at.get_connected_rolling_stock(direction == defines.rail_direction.front and defines.rail_direction.back or defines.rail_direction.front)
+    if at.disconnect_rolling_stock(direction) then
+        local new_train_id = at.train.id
+        at.train.schedule = schedule
+        at.train.manual_mode = false
+    
+        local yard = self.train_yards[network]
+        if not yard then return end
+    
+        yard:redefine_shunter(old_train_id, new_train_id)
+        if other then
+            assign_to.parked_train = other.train.id
+        end
+    end
 end
