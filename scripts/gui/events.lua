@@ -36,6 +36,7 @@ flib_gui.add_handlers({
 	["rsad-station-close"] = handle_close,
 	["rsad-station-type"] = handle_type_drop_down,
 	["rsad-station-network"] = handle_network,
+	["rsad-station-item-switch"] = handle_item_switch,
 	["rsad-station-item"] = handle_item,
 	["rsad-station-shunting-direction"] = handle_reversed,
 	["rsad-station-turnabout"] = handle_turnabout_drop_down,

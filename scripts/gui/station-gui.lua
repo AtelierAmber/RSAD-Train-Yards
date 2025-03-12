@@ -163,7 +163,12 @@ function handle_item(e)
     if element.elem_value then
         --[[@type SignalID]]
         local signal = {}
-        signal.name = element.elem_value --[[@as string]]
+        if element.elem_type == "fluid" then signal.type = "fluid" signal.name = element.elem_value --[[@as string]]
+        elseif element.elem_type == "item" then
+            signal.name = element.elem_value --[[@as string]]
+        else
+            signal = element.elem_value --[[@as SignalID?]]
+        end
         local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
         control.priority_signal = signal
         ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
@@ -176,6 +181,26 @@ function handle_item(e)
                 yard:add_or_update_station(station)
             end
         end
+    end
+end
+
+---@param e EventData.on_gui_elem_changed
+function handle_item_switch(e)
+	local element = e.element
+	if not element then return end
+
+    if element.switch_state == "left" then
+        element.parent.bottom.item.visible = true
+        element.parent.bottom.fluid.visible = false
+        element.parent.bottom.all.visible = false
+    elseif element.switch_state == "right" then
+        element.parent.bottom.item.visible = false
+        element.parent.bottom.fluid.visible = true
+        element.parent.bottom.all.visible = false
+    else
+        element.parent.bottom.item.visible = false
+        element.parent.bottom.fluid.visible = false
+        element.parent.bottom.all.visible = true
     end
 end
 
@@ -382,7 +407,7 @@ local function train_limit_bar(entity) return {
                             type = "slider",
                             style = "notched_slider",
                             name = "slider",
-                            style_mods = {horizontal_align = "left"},
+                            style_mods = {horizontal_align = "center"},
                             handler = handle_train_limit,
                             tags = { id = entity.unit_number },
                             value = entity.trains_limit,
@@ -394,7 +419,7 @@ local function train_limit_bar(entity) return {
                 {
                     type = "textfield",
                     name = "number_field",
-                    style_mods = {vertical_align = "center"},
+                    style_mods = {vertical_align = "top", horizontal_align = "left", width = 35},
                     handler = handle_train_limit,
                     tags = { id = entity.unit_number },
                     text = tostring(entity.trains_limit),
@@ -417,7 +442,7 @@ local function network_selection(entity, network) return {
             name = "network_label",
             style = "heading_2_label",
             caption = { "rsad-gui.network" },
-            style_mods = { top_padding = 8 },
+            style_mods = { top_padding = 8, bottom_padding = 24},
         },
         {
             type = "flow",
@@ -442,7 +467,8 @@ local function network_selection(entity, network) return {
 } end
 ---@param entity LuaEntity
 ---@param item SignalID?
-local function item_selection(entity, item) return {
+---@param switch string
+local function item_selection(entity, item, switch) return {
     type = "flow",
     name = "vflow_item",
     direction = "vertical",
@@ -456,6 +482,18 @@ local function item_selection(entity, item) return {
             style_mods = { top_padding = 8 },
         },
         {
+            type = "switch",
+            name = "item_request_switch",
+            left_label_caption = {"rsad-gui.item-switch-left"},
+            left_label_tooltip = {"rsad-gui.item-switch-left-tooltip"},
+            right_label_caption = {"rsad-gui.item-switch-right"},
+            right_label_tooltip = {"rsad-gui.item-switch-right-tooltip"},
+            tooltip = {"rsad-gui.item-switch-tooltip"},
+            allow_none_state = true,
+            switch_state = switch,
+            handler = handle_item_switch,
+        },
+        {
             type = "flow",
             name = "bottom",
             direction = "horizontal",
@@ -467,10 +505,35 @@ local function item_selection(entity, item) return {
                     style = "slot_button_in_shallow_frame",
                     elem_type = "item",
                     tooltip = { "rsad-gui.item-tooltip" },
-                    item = (item and item.name),
+                    item = ((item and not item.type) and item.name) or nil,
                     style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
                     handler = handle_item,
                     tags = { id = entity.unit_number },
+                    visible = switch == "left"
+                },
+                {
+                    type = "choose-elem-button",
+                    name = "fluid",
+                    style = "slot_button_in_shallow_frame",
+                    elem_type = "fluid",
+                    tooltip = { "rsad-gui.item-tooltip" },
+                    fluid = ((item and item.type == "fluid") and item.name) or nil,
+                    style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                    handler = handle_item,
+                    tags = { id = entity.unit_number },
+                    visible = switch == "right"
+                },
+                {
+                    type = "choose-elem-button",
+                    name = "all",
+                    style = "slot_button_in_shallow_frame",
+                    elem_type = "signal",
+                    tooltip = { "rsad-gui.item-tooltip" },
+                    signal = item,
+                    style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                    handler = handle_item,
+                    tags = { id = entity.unit_number },
+                    visible = switch == "none"
                 },
             },
         }
@@ -484,8 +547,9 @@ local function item_selection(entity, item) return {
 ---@param item SignalID?
 ---@param reversed boolean
 ---@param subtype integer
+---@param item_switch string
 ---@return flib.GuiElemDef
-function station_gui(entity, player, selected_index, network, item, reversed, subtype) return {
+function station_gui(entity, player, selected_index, network, item, reversed, subtype, item_switch) return {
     type = "frame",
     direction = "vertical",
     name = names.gui.rsad_station,
@@ -552,7 +616,7 @@ function station_gui(entity, player, selected_index, network, item, reversed, su
                             network_selection(entity, network),
                             { type = "line", direction = "vertical", style_mods = { top_padding = 10 } },
                             --Item
-                            item_selection(entity, item)
+                            item_selection(entity, item, item_switch)
                         }
                     }
                 }
@@ -576,13 +640,14 @@ end
 
 function open_station_gui(rootgui, entity, player)
     local selected_type, network, item, subtype, reversed = get_station_gui_settings(entity)
-    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item, reversed, subtype)})
+    local item_switch = (item and (((item.type == "fluid") and "right") or (not item.type and "left"))) or "none" 
+    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item, reversed, subtype, item_switch)})
     mainscreen.frame.vflow_main.preview_frame.preview.entity = entity
     mainscreen.titlebar.drag_target = mainscreen
     mainscreen.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. (selected_type-1)}, " Station"}
     mainscreen.force_auto_center()
 
-    mainscreen.tags = {unit_number = entity.unit_number}
+    mainscreen.tags = {unit_number = entity.unit_number, item_switch = item_switch}
     set_modal_visibility(selected_type-1, mainscreen)
     player.opened = mainscreen
 end

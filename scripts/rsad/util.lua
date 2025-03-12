@@ -12,7 +12,8 @@ function update_rsad_station_name(entity, control, index)
     end
     local item_name = ""
     if control.priority_signal and (index == rsad_station_type.import or index == rsad_station_type.request) then 
-        item_name = "[" .. (("item=" .. control.priority_signal.name) or "No Item") .. "]"
+        local type = (((not control.priority_signal.type and "item=") or (control.priority_signal.type == "fluid" and "fluid=")) or "virtual-signal=") --[[@as string]]
+        item_name = "[" .. (control.priority_signal and (type .. control.priority_signal.name) or "No Item") .. "]"
     end
     local turnabout_phase_string = ""
     ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35

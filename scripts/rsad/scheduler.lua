@@ -316,4 +316,14 @@ function scheduler.move_train_by_wagon_count(self, train, move_from, count, netw
     self.controller:trigger_tick()
 end
 
+--- #region SORTING IMPORT MULTI-INGREDIENT ---
+
+---@param self scheduler
+---@param incoming LuaTrain
+---@param station RSADStation
+function scheduler.on_receive_multi_import(self, incoming, station)
+    local wagons = incoming.cargo_wagons
+end
+
+--- #endregion ---
 return scheduler
