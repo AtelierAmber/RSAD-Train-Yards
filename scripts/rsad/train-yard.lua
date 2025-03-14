@@ -93,7 +93,7 @@ local function add_or_update_station(self, station)
     local success, station_entity, data = get_station_data(station)
     self:remove_station(station)
 
-    if not success or not data or not data.type then return false end
+    if not success or not data.type then return false end
 
     if data.type == rsad_station_type.turnabout then
         self[data.type][data.subtype] = station
@@ -150,9 +150,9 @@ local function update(self, controller)
                     end
                 end
             elseif not station.parked_train
-                   and (data_success and data and ((data.train_limit and station.assignments < data.train_limit) or station.assignments < 1)) then -- Check for already requested
+                   and (data_success and ((data.train_limit and station.assignments < data.train_limit) or station.assignments < 1)) then -- Check for already requested
 
-                local schedule_success, error = controller.scheduler:queue_station_request(controller, station)
+                local schedule_success, error = controller.scheduler:queue_station_request(station)
                 if not schedule_success and error then
                     game.print("Scheduling error code " .. error .. ". Please report this with the log file to the mod developer.")
                     log("Scheduling error code " .. error .. ". Please report this with the log file to the mod developer.")

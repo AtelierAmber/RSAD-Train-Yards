@@ -223,7 +223,7 @@ end
 function rsad_controller.decommision_station_from_yard(self, station, keep_network)
     if not station then return end
     local success, entity, data = get_station_data(station)
-    if not success or not data then
+    if not success then
         self.stations[station.unit_number] = nil
         return
     end
@@ -281,7 +281,7 @@ end
 ---@param old_state defines.train_state
 function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
     local success, station_entity, data = get_station_data(station)
-    if not success or not data then return end
+    if not success then return end
     local yard = self:get_train_yard_or_nil(data.network)
     if yard then
         if data.type == rsad_station_type.shunting_depot then

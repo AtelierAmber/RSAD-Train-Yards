@@ -55,6 +55,22 @@ local function default_target_record(target_station, reversed)
     }
 end
 
+---@param rail LuaRailEnd
+---@return ScheduleRecord
+local function default_rail_record(rail)
+    ---@type ScheduleRecord
+    return {
+        rail = rail.rail,
+        rail_direction = rail.direction,
+        wait_conditions = {
+            {
+                type = "time",
+                ticks = 2
+            }
+        }
+    }
+end
+
 ---@param station RSADStation
 ---@return boolean
 local function station_is_pending(self, station)
@@ -88,8 +104,8 @@ end
 ---@return ScheduleRecord[]?
 local function item_request_schedule(yard, requester_station)
     ---Create request station record
-    local data_scuccess, station_entity, station_data = get_station_data(requester_station)
-    if not data_scuccess or not station_data then return nil end
+    local data_success, station_entity, station_data = get_station_data(requester_station)
+    if not data_success then return nil end
     ---@type ScheduleRecord[]
     local request_record = default_target_record(requester_station, station_data.reversed_shunting)
     local records = {
@@ -106,8 +122,8 @@ local function item_request_schedule(yard, requester_station)
     ---Create pickup record
     local input_station = get_next_providing_station(yard, station_data.item and station_data.item.name)
     if not input_station then return nil end
-    data_scuccess, station_entity, station_data = get_station_data(input_station)
-    if data_scuccess and station_data then
+    data_success, station_entity, station_data = get_station_data(input_station)
+    if data_success then
         table.insert(records, 1, default_target_record(input_station, station_data.reversed_shunting))
     end
 
@@ -115,15 +131,14 @@ local function item_request_schedule(yard, requester_station)
 end
 
 ---@param self scheduler
----@param controller rsad_controller
 ---@param station RSADStation
 ---@return boolean, uint? --- Whether or not the request was successful, error number (nil if successful) 
-function scheduler.queue_station_request(self, controller, station)
+function scheduler.queue_station_request(self, station)
     if not station then return false, 3 end
     local success, station_entity, data = get_station_data(station)
-    if not success or not data then return false, 4 end
+    if not success then return false, 4 end
     
-    local yard = controller:get_or_create_train_yard(data.network) ---@type TrainYard?
+    local yard = self.controller:get_or_create_train_yard(data.network) ---@type TrainYard?
     if not yard then return false, 2 end
 
     ---Preliminary assertions
@@ -145,12 +160,69 @@ function scheduler.queue_station_request(self, controller, station)
     return true
 end
 
+--#region EMPTY WAGON SHUNTING
+
+---@param yard TrainYard
+---@param removal_station RSADStation
+---@return ScheduleRecord[]?
+local function remove_wagon_scheule(yard, removal_station)
+    local data_success, station_entity, station_data = get_station_data(removal_station)
+    if not data_success then return nil end
+
+    if not removal_station.parked_train then return nil end
+    local parked_entity = game.get_entity_by_unit_number(removal_station.parked_train)
+    local parked_train = parked_entity and parked_entity.train
+    if not parked_train then return nil end
+    local front, dir = get_front_stock(parked_train, station_entity)
+    local rail_end = (dir == defines.rail_direction.front and parked_train.back_end) or parked_train.front_end
+    ---@type ScheduleRecord[]
+    local pickup_record = default_rail_record(rail_end)
+    local records = {
+        [1] = pickup_record
+    }
+    ---Check for turnabout
+    local turnabout_station = yard[rsad_station_type.turnabout][rsad_shunting_stage.clear_empty]
+    local turnabout_record = nil
+    if turnabout_station then
+        turnabout_record = default_target_record(turnabout_station, false)
+        turnabout_record.wait_conditions = nil
+        table.insert(records, 1, turnabout_record)
+    end
+    ---Dropoff record
+    local empty_stagings = yard[rsad_station_type.empty_staging]
+    for unit, empty_station in pairs(empty_stagings) do
+        
+    end
+end
+
 ---@param self scheduler
 ---@param station RSADStation
 ---@return boolean, uint? --- Whether or not the request was successful, error number (nil if successful) 
 function scheduler.queue_shunt_wagon_to_empty(self, station)
+    if not station then return false, 3 end
+    local success, station_entity, data = get_station_data(station)
+    if not success then return false, 4 end
+    
+    local yard = self.controller:get_or_create_train_yard(data.network) ---@type TrainYard?
+    if not yard then return false, 2 end
 
+    ---Preliminary assertions
+    if not yard[rsad_station_type.empty_staging] or (next(yard.shunter_trains) == nil) or station_is_pending(self, station) then
+       return false --Failed to queue request, no Error 
+    end
+
+    ---@type PendingChange
+    local queued_data = {
+        station = station,
+        create_schedule = remove_wagon_scheule
+    }
+
+    queue.push_back(self.pending_changes, queued_data)
+
+    return true
 end
+
+--#endregion
 
 ---@param self scheduler
 ---@param train LuaTrain
@@ -173,8 +245,8 @@ function scheduler.update(self)
     local change = queue.pop_front(self.pending_changes)
     if not change then return false end
 
-    local data_scuccess, station_entity, station_data = get_station_data(change.station)
-    if not data_scuccess or not station_entity or not station_data or not station_data.network then goto tick_loop end
+    local data_success, station_entity, station_data = get_station_data(change.station)
+    if not data_success then goto tick_loop end
     local yard = self.controller:get_train_yard_or_nil(station_data.network)
     if not yard then goto tick_loop end
 

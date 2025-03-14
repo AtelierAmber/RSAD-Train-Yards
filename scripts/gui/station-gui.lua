@@ -23,6 +23,7 @@ local STATUS_SPRITES_DEFAULT = RED
 local STATUS_SPRITES_GHOST = YELLOW
 
 local max_train_limit = settings.startup["rsad-station-max-train-limit"].value
+local max_cargo_limit = settings.startup["rsad-station-max-cargo-limit"].value
 
 ---@param e EventData.on_gui_click
 function handle_close(e)
@@ -46,26 +47,30 @@ end
 
 ---@class VisibilityToggles
 ---@field public item boolean
----@field public turnabout boolean
+---@field public turnabout boolean 
+---@field public cargo boolean
 
 ---@type table<uint, VisibilityToggles>
 local modal_visibilities = {
-    [rsad_station_type.turnabout] = { item = false, turnabout = true },
-    [rsad_station_type.shunting_depot] = { item = false, turnabout = false },
-    [rsad_station_type.request] = { item = true, turnabout = false },
-    [rsad_station_type.import_staging] = { item = false, turnabout = false },
-    [rsad_station_type.import] = { item = true, turnabout = false },
-    [rsad_station_type.empty_staging] = { item = false, turnabout = false },
-    [rsad_station_type.empty_pickup] = { item = false, turnabout = false },
+    [rsad_station_type.turnabout] = { item = false, turnabout = true, cargo = false },
+    [rsad_station_type.shunting_depot] = { item = false, turnabout = false, cargo = false },
+    [rsad_station_type.request] = { item = true, turnabout = false, cargo = true },
+    [rsad_station_type.import_staging] = { item = false, turnabout = false, cargo = true },
+    [rsad_station_type.import] = { item = true, turnabout = false, cargo = true },
+    [rsad_station_type.empty_staging] = { item = false, turnabout = false, cargo = true },
+    [rsad_station_type.empty_pickup] = { item = false, turnabout = false, cargo = false },
 }
 
 ---@param selected_type rsad_station_type
 function set_modal_visibility(selected_type, mainscreen)
+    if not modal_visibilities[selected_type] then return end
     --- Item signal
-    mainscreen.frame.vflow_main.hflow_signals.vflow_item.visible = modal_visibilities[selected_type].item
+    mainscreen.frame.vflow_main.hflow_item.visible = modal_visibilities[selected_type].item
     --- Subtype
     mainscreen.frame.vflow_main.vflow_subtype.visible = modal_visibilities[selected_type].turnabout
-    mainscreen.frame.vflow_main.vflow_subtype.turnabout_type.visible = modal_visibilities[selected_type].turnabout
+    ---mainscreen.frame.vflow_main.vflow_subtype.turnabout_type.visible = modal_visibilities[selected_type].turnabout
+    --- Cargo
+    mainscreen.frame.vflow_main.vflow_cargo_limit.visible = modal_visibilities[selected_type].cargo
 end
 
 ---@param e EventData.on_gui_selection_state_changed
@@ -82,12 +87,8 @@ function handle_type_drop_down(e)
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local circuit = control.circuit_condition
     if bit32.extract(circuit.constant, 0, 4) == index then return end 
-    ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    circuit.constant = index
-    if index == rsad_station_type.turnabout then
----@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-        circuit.constant = bit32.replace(index, 1, 4, 4)
-    end
+    ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    circuit.constant = bit32.replace(circuit.constant, index, 0, 4)
     control.circuit_condition = circuit
 
     local station = rsad_controller.stations[unit_number]
@@ -101,26 +102,25 @@ function handle_type_drop_down(e)
 
     update_rsad_station_name(entity, control, index)
 
-    local player = game.get_player(e.player_index)
-    if not player then return end
-    player.opened.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. index}, " Station"}
+    local mainscreen = element.parent.parent.parent.parent --[[@as LuaGuiElement]]
+    mainscreen.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. index}, " Station"}
 
-	set_modal_visibility(index, player.opened)
+	set_modal_visibility(index, mainscreen)
 end
 
 function handle_turnabout_drop_down(e)
     local element = e.element
 	if not element then return end
+    local index = element.selected_index
+    if index == 0 then return end
 
     local unit_number = element.tags.id --[[@as uint]]
 	local entity = game.get_entity_by_unit_number(unit_number)
 	if not entity or not entity.valid then return end
 
-    local index = element.selected_index
-
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local circuit = control.circuit_condition
-    ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
     circuit.constant = bit32.replace(circuit.constant, index, 4, 4)
     control.circuit_condition = circuit
 
@@ -171,7 +171,7 @@ function handle_item(e)
         end
         local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
         control.priority_signal = signal
-        ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
+        ------@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
         update_rsad_station_name(entity, control, bit32.extract(control.circuit_condition.constant, 0, 4))
 
         local station = rsad_controller.stations[unit_number]
@@ -190,17 +190,17 @@ function handle_item_switch(e)
 	if not element then return end
 
     if element.switch_state == "left" then
-        element.parent.bottom.item.visible = true
-        element.parent.bottom.fluid.visible = false
-        element.parent.bottom.all.visible = false
+        element.parent.button.item.visible = true
+        element.parent.button.fluid.visible = false
+        element.parent.button.all.visible = false
     elseif element.switch_state == "right" then
-        element.parent.bottom.item.visible = false
-        element.parent.bottom.fluid.visible = true
-        element.parent.bottom.all.visible = false
+        element.parent.button.item.visible = false
+        element.parent.button.fluid.visible = true
+        element.parent.button.all.visible = false
     else
-        element.parent.bottom.item.visible = false
-        element.parent.bottom.fluid.visible = false
-        element.parent.bottom.all.visible = true
+        element.parent.button.item.visible = false
+        element.parent.button.fluid.visible = false
+        element.parent.button.all.visible = true
     end
 end
 
@@ -232,17 +232,40 @@ function handle_train_limit(e)
     if element.type == "slider" then
         local value = flib_math.clamp(element.slider_value, 1, max_train_limit)
         entity.trains_limit = value
-        local player = game.get_player(e.player_index)
-        if not player then return end
-        player.opened.frame.vflow_main.vflow_train_limit.train_limit.number_field.text = tostring(entity.trains_limit)
+        element.parent.number_field.text = tostring(entity.trains_limit)
     else
         local value = flib_math.clamp(tonumber(element.text), 1, max_train_limit)
         entity.trains_limit =  value
         element.text = tostring(value)
-        local player = game.get_player(e.player_index)
-        if not player then return end
-        player.opened.frame.vflow_main.vflow_train_limit.train_limit.slider_collection.slider.slider_value = entity.trains_limit
+        element.parent.slider.slider_value = entity.trains_limit
     end
+end
+
+function handle_cargo_limit(e)
+    local element = e.element
+	if not element then return end
+
+    local unit_number = element.tags.id --[[@as uint]]
+	local entity = game.get_entity_by_unit_number(unit_number)
+	if not entity or not entity.valid then return end
+
+    local limit = 1
+    if element.type == "slider" then
+        local value = flib_math.clamp(element.slider_value, 1, max_cargo_limit)
+        limit = value
+        element.parent.number_field.text = tostring(limit)
+    else
+        local value = flib_math.clamp(tonumber(element.text), 1, max_cargo_limit)
+        limit =  value
+        element.text = tostring(value)
+        element.parent.slider.slider_value = limit
+    end
+
+    local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
+    local circuit = control.circuit_condition
+    ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    circuit.constant = bit32.replace(circuit.constant, limit, 4, 4)
+    control.circuit_condition = circuit
 end
 
 local status_gui = {
@@ -252,7 +275,6 @@ local status_gui = {
     style_mods = {
         vertical_align = "center",
         horizontally_stretchable = true,
-        bottom_padding = 4,
     },
     children = {
         {
@@ -282,22 +304,24 @@ local preview_gui = {
     },
 }
 
-local type_gui_label = {
-    type = "label",
-    style = "heading_2_label",
-    caption = { "rsad-gui.station-type" },
-    style_mods = { top_padding = 8 }
-}
 ---@param entity LuaEntity
 local function type_gui_drop_down(entity, selected_index) return {
     type = "flow",
-    name = "top",
+    name = "type_gui",
     direction = "horizontal",
-    style_mods = { vertical_align = "center" },
+    style = "player_input_horizontal_flow",
     children = {
         {
+            type = "label",
+            style = "label",
+            caption = { "rsad-gui.station-type" },
+        },
+        {
+            type = "empty-widget",
+            style_mods = {horizontally_stretchable = true,}
+        },
+        {
             type = "drop-down",
-            style_mods = { top_padding = 3, right_margin = 8 },
             handler = handle_type_drop_down,
             tags = { id = entity.unit_number },
             selected_index = selected_index,
@@ -317,16 +341,20 @@ local function type_gui_drop_down(entity, selected_index) return {
 ---@param reversed boolean
 local function shunting_switch(entity, reversed) return {
     type = "flow",
-    name = "vflow_switch",
-    direction = "vertical",
-    style_mods = {horizontal_align = "left"},
+    name = "hflow_switch",
+    direction = "horizontal",
+    style = "player_input_horizontal_flow",
+    style_mods = { vertical_align = "center", horizontal_align = "left" },
     children = {
         {
             type = "label",
             name = "switch_label",
-            style = "heading_2_label",
+            style = "label",
             caption = {"rsad-gui.shunting-direction-switch"},
-            style_mods = {top_padding = 8}
+        },
+        {
+            type = "empty-widget",
+            style_mods = {horizontally_stretchable = true,}
         },
         {
             type = "switch",
@@ -348,26 +376,30 @@ local function subtype_drop_down(entity, subtype) return {
     type = "flow",
     name = "vflow_subtype",
     direction = "vertical",
-    style_mods = {horizontal_align = "center"},
+    style_mods = {horizontal_align = "left"},
     children = {
-        { type = "line", style_mods = { top_padding = 10 } },
         {
             type = "flow",
             name = "turnabout_type",
-            direction = "vertical",
+            direction = "horizontal",
+            style = "player_input_horizontal_flow",
             style_mods = {horizontal_align = "left"},
             children = {
                 {
                     type = "label",
-                    style = "heading_2_label",
+                    style = "label",
                     caption = { "rsad-gui.station-turnabout" }
                 },
                 {
+                    type = "empty-widget",
+                    style_mods = {horizontally_stretchable = true,}
+                },
+                {
                     type = "drop-down",
-                    style_mods = { top_padding = 3, right_margin = 8 },
+                    style_mods = { },
                     handler = handle_turnabout_drop_down,
                     tags = { id = entity.unit_number },
-                    selected_index = subtype,
+                    selected_index = ((subtype >= rsad_shunting_stage.sort_imports and subtype < rsad_shunting_stage.return_to_depot) and subtype) or 0,
                     items = {
                         { "rsad-gui.turnabout-phase.phase-1" },
                         { "rsad-gui.turnabout-phase.phase-2" },
@@ -385,41 +417,36 @@ local function train_limit_bar(entity) return {
     direction = "vertical",
     style_mods = {horizontal_align = "left"},
     children = {
-        { type = "line", style_mods = { top_padding = 10, bottom_padding = 1 } },
         {
             type = "flow",
             name = "train_limit",
             direction = "horizontal",
+            style = "player_input_horizontal_flow",
             style_mods = {vertical_align = "center"},
             children = {
                 {
-                    type = "flow",
-                    name = "slider_collection",
-                    direction = "vertical",
-                    style_mods = {horizontal_align = "left"},
-                    children = {
-                        {
-                            type = "label",
-                            style = "heading_2_label",
-                            caption = { "rsad-gui.station-train-limit" }
-                        },
-                        {
-                            type = "slider",
-                            style = "notched_slider",
-                            name = "slider",
-                            style_mods = {horizontal_align = "center"},
-                            handler = handle_train_limit,
-                            tags = { id = entity.unit_number },
-                            value = entity.trains_limit,
-                            minimum_value = 1,
-                            maximum_value = max_train_limit
-                        }
-                    }
+                    type = "label",
+                    style = "label",
+                    caption = { "rsad-gui.station-train-limit" }
+                },
+                {
+                    type = "empty-widget",
+                    style_mods = {horizontally_stretchable = true,}
+                },
+                {
+                    type = "slider",
+                    style = "notched_slider",
+                    name = "slider",
+                    handler = handle_train_limit,
+                    tags = { id = entity.unit_number },
+                    value = entity.trains_limit,
+                    minimum_value = 1,
+                    maximum_value = max_train_limit
                 },
                 {
                     type = "textfield",
                     name = "number_field",
-                    style_mods = {vertical_align = "top", horizontal_align = "left", width = 35},
+                    style_mods = { width = 35},
                     handler = handle_train_limit,
                     tags = { id = entity.unit_number },
                     text = tostring(entity.trains_limit),
@@ -430,39 +457,82 @@ local function train_limit_bar(entity) return {
     }
 } end
 ---@param entity LuaEntity
+---@param subtype integer
+local function cargo_limit_bar(entity, subtype) return {
+    type = "flow",
+    name = "vflow_cargo_limit",
+    direction = "vertical",
+    style_mods = {horizontal_align = "left"},
+    children = {
+        {
+            type = "flow",
+            name = "cargo_limit",
+            direction = "horizontal",
+            style = "player_input_horizontal_flow",
+            style_mods = {vertical_align = "center"},
+            children = {
+                {
+                    type = "label",
+                    style = "label",
+                    caption = { "rsad-gui.station-cargo-limit" }
+                },
+                {
+                    type = "empty-widget",
+                    style_mods = {horizontally_stretchable = true,}
+                },
+                {
+                    type = "slider",
+                    style = "notched_slider",
+                    name = "slider",
+                    handler = handle_cargo_limit,
+                    tags = { id = entity.unit_number },
+                    value = subtype,
+                    minimum_value = 1,
+                    maximum_value = max_train_limit
+                },
+                {
+                    type = "textfield",
+                    name = "number_field",
+                    style_mods = { width = 35},
+                    handler = handle_cargo_limit,
+                    tags = { id = entity.unit_number },
+                    text = tostring(subtype),
+                    numeric = true
+                }
+            }
+        }
+    }
+} end
+---@param entity LuaEntity
 ---@param network SignalID?
 local function network_selection(entity, network) return {
     type = "flow",
-    name = "vflow_network",
-    direction = "vertical",
-    style_mods = {horizontal_align = "center"},
+    name = "hflow_network",
+    direction = "horizontal",
+    style = "player_input_horizontal_flow",
     children = {
         {
             type = "label",
             name = "network_label",
-            style = "heading_2_label",
+            style = "label",
             caption = { "rsad-gui.network" },
-            style_mods = { top_padding = 8, bottom_padding = 24},
+            style_mods = { },
         },
         {
-            type = "flow",
-            name = "bottom",
-            direction = "horizontal",
-            style_mods = { vertical_align = "top" },
-            children = {
-                {
-                    type = "choose-elem-button",
-                    name = "network",
-                    style = "slot_button_in_shallow_frame",
-                    elem_type = "signal",
-                    tooltip = { "rsad-gui.network-tooltip" },
-                    signal = network,
-                    style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
-                    handler = handle_network,
-                    tags = { id = entity.unit_number },
-                },
-            },
-        }
+            type = "empty-widget",
+            style_mods = {horizontally_stretchable = true,}
+        },
+        {
+            type = "choose-elem-button",
+            name = "network",
+            style = "slot_button_in_shallow_frame",
+            elem_type = "signal",
+            tooltip = { "rsad-gui.network-tooltip" },
+            signal = network,
+            style_mods = { },
+            handler = handle_network,
+            tags = { id = entity.unit_number },
+        },
     }
 } end
 ---@param entity LuaEntity
@@ -470,32 +540,37 @@ local function network_selection(entity, network) return {
 ---@param switch string
 local function item_selection(entity, item, switch) return {
     type = "flow",
-    name = "vflow_item",
-    direction = "vertical",
-    style_mods = {horizontal_align = "center"},
+    name = "hflow_item",
+    direction = "horizontal",
+    style = "player_input_horizontal_flow",
+    style_mods = {width = 400},
     children = {
         {
             type = "label",
             name = "item_label",
-            style = "heading_2_label",
+            style = "label",
             caption = { "rsad-gui.item" },
-            style_mods = { top_padding = 8 },
+            style_mods = { },
+        },
+        {
+            type = "empty-widget",
+            style_mods = {horizontally_stretchable = true,}
         },
         {
             type = "switch",
             name = "item_request_switch",
-            left_label_caption = {"rsad-gui.item-switch-left"},
-            left_label_tooltip = {"rsad-gui.item-switch-left-tooltip"},
-            right_label_caption = {"rsad-gui.item-switch-right"},
-            right_label_tooltip = {"rsad-gui.item-switch-right-tooltip"},
-            tooltip = {"rsad-gui.item-switch-tooltip"},
+            left_label_caption = { "rsad-gui.item-switch-left" },
+            left_label_tooltip = { "rsad-gui.item-switch-left-tooltip" },
+            right_label_caption = { "rsad-gui.item-switch-right" },
+            right_label_tooltip = { "rsad-gui.item-switch-right-tooltip" },
+            tooltip = { "rsad-gui.item-switch-tooltip" },
             allow_none_state = true,
             switch_state = switch,
             handler = handle_item_switch,
         },
         {
             type = "flow",
-            name = "bottom",
+            name = "buttons",
             direction = "horizontal",
             style_mods = { vertical_align = "top" },
             children = {
@@ -506,7 +581,7 @@ local function item_selection(entity, item, switch) return {
                     elem_type = "item",
                     tooltip = { "rsad-gui.item-tooltip" },
                     item = ((item and not item.type) and item.name) or nil,
-                    style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                    style_mods = { },
                     handler = handle_item,
                     tags = { id = entity.unit_number },
                     visible = switch == "left"
@@ -518,7 +593,7 @@ local function item_selection(entity, item, switch) return {
                     elem_type = "fluid",
                     tooltip = { "rsad-gui.item-tooltip" },
                     fluid = ((item and item.type == "fluid") and item.name) or nil,
-                    style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                    style_mods = {  },
                     handler = handle_item,
                     tags = { id = entity.unit_number },
                     visible = switch == "right"
@@ -530,7 +605,7 @@ local function item_selection(entity, item, switch) return {
                     elem_type = "signal",
                     tooltip = { "rsad-gui.item-tooltip" },
                     signal = item,
-                    style_mods = { bottom_margin = 1, right_margin = 6, top_margin = 2 },
+                    style_mods = {  },
                     handler = handle_item,
                     tags = { id = entity.unit_number },
                     visible = switch == "none"
@@ -538,7 +613,7 @@ local function item_selection(entity, item, switch) return {
             },
         }
     }
-} end
+}end
 
 ---@param entity LuaEntity
 ---@param player LuaPlayer
@@ -553,6 +628,7 @@ function station_gui(entity, player, selected_index, network, item, reversed, su
     type = "frame",
     direction = "vertical",
     name = names.gui.rsad_station,
+    style_mods = {width = 448},
     children = {
         {
             type = "flow",
@@ -588,37 +664,28 @@ function station_gui(entity, player, selected_index, network, item, reversed, su
                 type = "flow",
                 name = "vflow_main",
                 direction = "vertical",
-                style_mods = { horizontal_align = "left" },
+                style_mods = { horizontal_align = "left", vertical_spacing = 8 },
                 children = {
                     --status
                     status_gui,
                     --preview
                     preview_gui,
                     --Type drop down
-                    type_gui_label,
                     type_gui_drop_down(entity, selected_index),
-                    { type = "line", style_mods = { top_padding = 10 } },
+                    --Network
+                    network_selection(entity, network),
+                    { type = "line" },
+                    {type = "label", style = "caption_label", name = "settings_label", caption = {"rsad-gui.settings-label"}},
                     ---Reversed Shunting switch
                     shunting_switch(entity, reversed),
                     ---Subtype section
                     subtype_drop_down(entity, subtype),
                     ---Train Limit slider
                     train_limit_bar(entity),
-                    ---Network and Item
-                    { type = "line", style_mods = { top_padding = 10 } },
-                    {
-                        type = "flow",
-                        name = "hflow_signals",
-                        direction = "horizontal",
-                        style_mods = {horizontal_align = "center", vertical_align = "center"},
-                        children = {
-                            --Network
-                            network_selection(entity, network),
-                            { type = "line", direction = "vertical", style_mods = { top_padding = 10 } },
-                            --Item
-                            item_selection(entity, item, item_switch)
-                        }
-                    }
+                    ---Cargo Limit slider
+                    cargo_limit_bar(entity, subtype),
+                    --Item
+                    item_selection(entity, item, item_switch)
                 }
             }
         }
@@ -630,8 +697,8 @@ function station_gui(entity, player, selected_index, network, item, reversed, su
 ---@return uint selected_type, SignalID? network, SignalID? item, uint subtype, boolean reversed
 function get_station_gui_settings(entity)
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
-    ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
-    local constant = control.circuit_condition.constant
+    ------@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
+    local constant = control.circuit_condition.constant or 0
     local type = bit32.extract(constant, 0, 4)
     local subtype = bit32.extract(constant, 4, 4)
     local reversed = bit32.extract(constant, 8, 1)
@@ -647,7 +714,7 @@ function open_station_gui(rootgui, entity, player)
     mainscreen.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. (selected_type-1)}, " Station"}
     mainscreen.force_auto_center()
 
-    mainscreen.tags = {unit_number = entity.unit_number, item_switch = item_switch}
+    mainscreen.tags = {unit_number = entity.unit_number}
     set_modal_visibility(selected_type-1, mainscreen)
     player.opened = mainscreen
 end

@@ -1,23 +1,6 @@
 require("scripts.rsad.train-yard")
 require("scripts.rsad.util")
 
----@param train LuaTrain
----@param station_entity LuaEntity
----@return LuaEntity, defines.rail_direction
-local function get_front_stock(train, station_entity)
-    local front_dist = position_distance(train.front_stock.position, station_entity.position)
-    local back_dist = position_distance(train.back_stock.position, station_entity.position)
-    if front_dist < back_dist then return train.front_stock, defines.rail_direction.front end
-    return train.back_stock, defines.rail_direction.back
-end
-
----@param train LuaTrain
----@return LuaEntity entity, defines.rail_direction front_direction
-local function get_back_cargo(train)
-    local back = train.carriages[#train.carriages].type ~= "locomotive"
-    return (back and train.carriages[#train.carriages] or train.carriages[1]), (back and defines.rail_direction.front or defines.rail_direction.back)
-end
-
 ---@param self rsad_controller
 ---@param train LuaTrain
 ---@param station RSADStation
@@ -25,7 +8,7 @@ end
 ---@return boolean success
 function rsad_controller.attempt_couple_at_station(self, train, station, count)
     local success, entity, station_data = get_station_data(station)
-    if not success or not entity or not station_data then return false end
+    if not success then return false end
     local old_train_id, old_train_length = train.id, table_size(train.carriages)
     local schedule = train.schedule
 
@@ -87,7 +70,7 @@ function rsad_controller.decouple_all_cargo(self, train, station, is_shunter)
     if not is_shunter then return false end
 
     local success, entity, station_data = get_station_data(station)
-    if not success or not entity or not station_data or not entity.valid then return false end
+    if not success then return false end
 
     local yard = self.train_yards[signal_hash(station_data.network)] --[[@type TrainYard]]
     if not yard then return true, train end

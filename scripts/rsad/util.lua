@@ -38,3 +38,19 @@ end
 function position_distance(p1, p2)
     return math.sqrt((p2.x - p1.x)^2 + (p2.y-p1.y)^2)
 end
+---@param train LuaTrain
+---@param station_entity LuaEntity
+---@return LuaEntity, defines.rail_direction
+function get_front_stock(train, station_entity)
+    local front_dist = position_distance(train.front_stock.position, station_entity.position)
+    local back_dist = position_distance(train.back_stock.position, station_entity.position)
+    if front_dist < back_dist then return train.front_stock, defines.rail_direction.front end
+    return train.back_stock, defines.rail_direction.back
+end
+
+---@param train LuaTrain
+---@return LuaEntity entity, defines.rail_direction front_direction
+function get_back_cargo(train)
+    local back = train.carriages[#train.carriages].type ~= "locomotive"
+    return (back and train.carriages[#train.carriages] or train.carriages[1]), (back and defines.rail_direction.front or defines.rail_direction.back)
+end

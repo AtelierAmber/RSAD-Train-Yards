@@ -13,4 +13,11 @@ data:extend{
     default_value = 4,
     order = "a"
   },
+  {
+    type = "int-setting",
+    name = "rsad-station-max-cargo-limit",
+    setting_type = "startup",
+    default_value = 4,
+    order = "a"
+  },
 }

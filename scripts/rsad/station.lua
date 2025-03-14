@@ -16,13 +16,6 @@ require("scripts.rsad.util")
 ---@field public assignments uint -- Number of assigned trains to this station
 ---@field public parked_train uint? -- train ID that is currently parked at this station. Wagons without a locomotive also have a train ID. nil if none
 
----                                    success  data        
--- ---@field public data fun(self: self): boolean, StationData?
--- ---                                                         success
--- ---@field public update fun(self: self, new_data: StationData): boolean
--- ---
--- ---@field public decommision fun(self: self)
-
 ---@param constant int
 ---@return uint type, uint subtype, boolean reversed
 local function unpack_station_constant(constant)
@@ -42,10 +35,11 @@ local function pack_station_constant(type, subtype, reversed)
 end
 
 ---@param station RSADStation
----@return boolean success, LuaEntity? station_entity, StationData? data
+---@return boolean success, LuaEntity station_entity, StationData data
 function get_station_data(station)
     local station_entity = station and game.get_entity_by_unit_number(station.unit_number)
-    if not station_entity or not station_entity.valid then return false end
+---@diagnostic disable-next-line: return-type-mismatch
+    if not station_entity or not station_entity.valid then return false, nil, nil end
 
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
 
@@ -73,7 +67,7 @@ function update_station_data(station, new_data)
     if not station_entity or not station_entity.valid then return false end
 
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
-    ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
+    ------@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
     local old_type, old_subtype, old_reversed = unpack_station_constant(control.circuit_condition.constant or 1)
     local type, network, item, subtype, train_limit, reversed =
         new_data.type or old_type, new_data.network or control.stopped_train_signal,
@@ -91,7 +85,7 @@ function update_station_data(station, new_data)
     if train_limit == 0 then station_entity.trains_limit = nil else station_entity.trains_limit = train_limit end
 
     local circuit = control.circuit_condition
-    ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
+    ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
     circuit.constant = pack_station_constant(type, subtype, reversed)
     control.circuit_condition = circuit
 
