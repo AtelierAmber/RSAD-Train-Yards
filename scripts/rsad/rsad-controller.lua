@@ -3,7 +3,8 @@ require("scripts.rsad.station")
 scheduler = require("scripts.rsad.scheduler")
 require("scripts.util.events")
 
-ticks_per_update = math.floor(360/settings.startup["rsad-station-update-rate"].value) + 1
+local ticks_per_update = math.floor(360/settings.startup["rsad-station-update-rate"].value) + 1
+local max_train_limit = settings.startup["rsad-station-max-train-limit"].value --[[@as integer]]
 
 ---@type string?
 active_yard = nil
@@ -99,6 +100,10 @@ end
 function rsad_controller.__on_station_built(self, entity)
     if entity.name == "entity-ghost" or entity.name ~= names.entities.rsad_station then return true end
 
+    if entity.trains_limit > max_train_limit then
+        entity.trains_limit = 1
+    end
+    
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local network = control.stopped_train_signal --[[@as SignalID?]]
     if network then

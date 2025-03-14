@@ -20,9 +20,9 @@ require("scripts.rsad.util")
 ---@return uint type, uint subtype, boolean reversed
 local function unpack_station_constant(constant)
     --- Layout: Station Type | Station Subtype | Reversed Shunting |
-    local type = bit32.extract(constant, 0, 4)              -- 0000 0000 1111
-    local subtype = bit32.extract(constant, 4, 4)           -- 0000 1111 0000
-    local reversed = bit32.extract(constant, 8, 1) == 1     -- 0001 0000 0000
+    local type = bit32.extract(constant, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH)
+    local subtype = bit32.extract(constant, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
+    local reversed = bit32.extract(constant, SHUNTING_DIRECTION, SHUNTING_DIRECTION_WIDTH) == 1
     return type, subtype, reversed
 end
 
@@ -31,7 +31,7 @@ end
 ---@param reversed boolean
 ---@return uint
 local function pack_station_constant(type, subtype, reversed)
-    return bit32.bor(type, bit32.lshift(subtype, 4), bit32.lshift(reversed and 1 or 0, 5))
+    return bit32.bor(type, bit32.lshift(reversed and 1 or 0, STATION_TYPE_ID_WIDTH), bit32.lshift(subtype, STATION_TYPE_ID_WIDTH + SHUNTING_DIRECTION_WIDTH))
 end
 
 ---@param station RSADStation

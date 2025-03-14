@@ -17,7 +17,7 @@ function update_rsad_station_name(entity, control, index)
     end
     local turnabout_phase_string = ""
     ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    local turnabout_phase = bit32.extract(control.circuit_condition.constant, 4, 4)
+    local turnabout_phase = bit32.extract(control.circuit_condition.constant, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
     if index == rsad_station_type.turnabout then
         turnabout_phase_string = rsad_stage_name[turnabout_phase] .. " "
     end

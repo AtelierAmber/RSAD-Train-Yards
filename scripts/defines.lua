@@ -33,3 +33,10 @@ rsad_stage_name[rsad_shunting_stage.sort_imports] = "Import Sorting"
 rsad_stage_name[rsad_shunting_stage.delivery] = "Item Delivery"
 rsad_stage_name[rsad_shunting_stage.clear_empty] = "Empty Wagon Clear"
 rsad_stage_name[rsad_shunting_stage.return_to_depot] = "Depot Return"
+
+STATION_TYPE_ID = 0
+STATION_TYPE_ID_WIDTH = 4
+SHUNTING_DIRECTION = 4
+SHUNTING_DIRECTION_WIDTH = 1
+STATION_SUBINFO = 5
+STATION_SUBINFO_WIDTH = 8

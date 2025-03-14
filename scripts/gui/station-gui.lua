@@ -47,18 +47,19 @@ end
 
 ---@class VisibilityToggles
 ---@field public item boolean
+---@field public direction boolean
 ---@field public turnabout boolean 
 ---@field public cargo boolean
 
 ---@type table<uint, VisibilityToggles>
 local modal_visibilities = {
-    [rsad_station_type.turnabout] = { item = false, turnabout = true, cargo = false },
-    [rsad_station_type.shunting_depot] = { item = false, turnabout = false, cargo = false },
-    [rsad_station_type.request] = { item = true, turnabout = false, cargo = true },
-    [rsad_station_type.import_staging] = { item = false, turnabout = false, cargo = true },
-    [rsad_station_type.import] = { item = true, turnabout = false, cargo = true },
-    [rsad_station_type.empty_staging] = { item = false, turnabout = false, cargo = true },
-    [rsad_station_type.empty_pickup] = { item = false, turnabout = false, cargo = false },
+    [rsad_station_type.turnabout] = { item = false, direction = false, turnabout = true, cargo = false },
+    [rsad_station_type.shunting_depot] = { item = false,  direction = false, turnabout = false, cargo = false },
+    [rsad_station_type.request] = { item = true,  direction = true, turnabout = false, cargo = true },
+    [rsad_station_type.import_staging] = { item = false,  direction = true, turnabout = false, cargo = true },
+    [rsad_station_type.import] = { item = true,  direction = true, turnabout = false, cargo = true },
+    [rsad_station_type.empty_staging] = { item = false,  direction = true, turnabout = false, cargo = true },
+    [rsad_station_type.empty_pickup] = { item = false,  direction = true, turnabout = false, cargo = false },
 }
 
 ---@param selected_type rsad_station_type
@@ -71,6 +72,8 @@ function set_modal_visibility(selected_type, mainscreen)
     ---mainscreen.frame.vflow_main.vflow_subtype.turnabout_type.visible = modal_visibilities[selected_type].turnabout
     --- Cargo
     mainscreen.frame.vflow_main.vflow_cargo_limit.visible = modal_visibilities[selected_type].cargo
+    --- Shunting Switch
+    mainscreen.frame.vflow_main.hflow_switch.visible = modal_visibilities[selected_type].direction
 end
 
 ---@param e EventData.on_gui_selection_state_changed
@@ -86,9 +89,9 @@ function handle_type_drop_down(e)
 
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local circuit = control.circuit_condition
-    if bit32.extract(circuit.constant, 0, 4) == index then return end 
+    if bit32.extract(circuit.constant, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH) == index then return end 
     ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    circuit.constant = bit32.replace(circuit.constant, index, 0, 4)
+    circuit.constant = bit32.replace(circuit.constant, index, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH)
     control.circuit_condition = circuit
 
     local station = rsad_controller.stations[unit_number]
@@ -121,7 +124,7 @@ function handle_turnabout_drop_down(e)
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local circuit = control.circuit_condition
     ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    circuit.constant = bit32.replace(circuit.constant, index, 4, 4)
+    circuit.constant = bit32.replace(circuit.constant, index, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
     control.circuit_condition = circuit
 
     local station = rsad_controller.stations[unit_number]
@@ -132,7 +135,7 @@ function handle_turnabout_drop_down(e)
         end
     end
 
-    update_rsad_station_name(entity, control, bit32.extract(circuit.constant, 0, 4))
+    update_rsad_station_name(entity, control, bit32.extract(circuit.constant, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH))
 end
 
 ---@param e EventData.on_gui_elem_changed
@@ -172,7 +175,7 @@ function handle_item(e)
         local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
         control.priority_signal = signal
         ------@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
-        update_rsad_station_name(entity, control, bit32.extract(control.circuit_condition.constant, 0, 4))
+        update_rsad_station_name(entity, control, bit32.extract(control.circuit_condition.constant, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH))
 
         local station = rsad_controller.stations[unit_number]
         if station and entity.name ~= "entity-ghost" then            
@@ -190,17 +193,17 @@ function handle_item_switch(e)
 	if not element then return end
 
     if element.switch_state == "left" then
-        element.parent.button.item.visible = true
-        element.parent.button.fluid.visible = false
-        element.parent.button.all.visible = false
+        element.parent.buttons.item.visible = true
+        element.parent.buttons.fluid.visible = false
+        element.parent.buttons.all.visible = false
     elseif element.switch_state == "right" then
-        element.parent.button.item.visible = false
-        element.parent.button.fluid.visible = true
-        element.parent.button.all.visible = false
+        element.parent.buttons.item.visible = false
+        element.parent.buttons.fluid.visible = true
+        element.parent.buttons.all.visible = false
     else
-        element.parent.button.item.visible = false
-        element.parent.button.fluid.visible = false
-        element.parent.button.all.visible = true
+        element.parent.buttons.item.visible = false
+        element.parent.buttons.fluid.visible = false
+        element.parent.buttons.all.visible = true
     end
 end
 
@@ -217,7 +220,7 @@ function handle_reversed(e)
     local state_val = element.switch_state == "left" and 0 or 1
 
 ---@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    circuit.constant = bit32.replace(circuit.constant, state_val, 8, 1)
+    circuit.constant = bit32.replace(circuit.constant, state_val, SHUNTING_DIRECTION, SHUNTING_DIRECTION_WIDTH)
     control.circuit_condition = circuit
 end
 
@@ -264,7 +267,7 @@ function handle_cargo_limit(e)
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     local circuit = control.circuit_condition
     ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    circuit.constant = bit32.replace(circuit.constant, limit, 4, 4)
+    circuit.constant = bit32.replace(circuit.constant, limit, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
     control.circuit_condition = circuit
 end
 
@@ -699,9 +702,9 @@ function get_station_gui_settings(entity)
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     ------@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
     local constant = control.circuit_condition.constant or 0
-    local type = bit32.extract(constant, 0, 4)
-    local subtype = bit32.extract(constant, 4, 4)
-    local reversed = bit32.extract(constant, 8, 1)
+    local type = bit32.extract(constant, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH)
+    local subtype = bit32.extract(constant, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
+    local reversed = bit32.extract(constant, SHUNTING_DIRECTION, SHUNTING_DIRECTION_WIDTH)
 	return  type + 1, control.stopped_train_signal, control.priority_signal, subtype, reversed == 1
 end
 
