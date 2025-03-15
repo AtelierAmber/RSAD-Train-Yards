@@ -5,7 +5,7 @@ require("scripts.rsad.util")
 ---@field public type rsad_station_type?
 ---@field public network SignalID?
 ---@field public item SignalID?
----@field public subtype uint?
+---@field public subinfo uint?
 ---@field public train_limit uint?
 ---@field public reversed_shunting boolean?
 
@@ -17,21 +17,21 @@ require("scripts.rsad.util")
 ---@field public parked_train uint? -- train ID that is currently parked at this station. Wagons without a locomotive also have a train ID. nil if none
 
 ---@param constant int
----@return uint type, uint subtype, boolean reversed
+---@return uint type, uint subinfo, boolean reversed
 local function unpack_station_constant(constant)
-    --- Layout: Station Type | Station Subtype | Reversed Shunting |
+    --- Layout: Station Type | Reversed Shunting | Station Subinfo |
     local type = bit32.extract(constant, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH)
-    local subtype = bit32.extract(constant, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
+    local subinfo = bit32.extract(constant, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
     local reversed = bit32.extract(constant, SHUNTING_DIRECTION, SHUNTING_DIRECTION_WIDTH) == 1
-    return type, subtype, reversed
+    return type, subinfo, reversed
 end
 
 ---@param type rsad_station_type|uint
----@param subtype uint
+---@param subinfo uint
 ---@param reversed boolean
 ---@return uint
-local function pack_station_constant(type, subtype, reversed)
-    return bit32.bor(type, bit32.lshift(reversed and 1 or 0, STATION_TYPE_ID_WIDTH), bit32.lshift(subtype, STATION_TYPE_ID_WIDTH + SHUNTING_DIRECTION_WIDTH))
+local function pack_station_constant(type, subinfo, reversed)
+    return bit32.bor(type, bit32.lshift(reversed and 1 or 0, STATION_TYPE_ID_WIDTH), bit32.lshift(subinfo, STATION_TYPE_ID_WIDTH + SHUNTING_DIRECTION_WIDTH))
 end
 
 ---@param station RSADStation
@@ -44,14 +44,14 @@ function get_station_data(station)
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
 
 ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.53
-    local type, subtype, reversed = unpack_station_constant(control.circuit_condition.constant)
+    local type, subinfo, reversed = unpack_station_constant(control.circuit_condition.constant)
 
     ---@type StationData
     local data = {
         type = type --[[@as rsad_station_type]],
         network = control.stopped_train_signal,
         item = control.priority_signal,
-        subtype = subtype,
+        subinfo = subinfo,
         train_limit = station_entity.trains_limit,
         reversed_shunting = reversed
     }
@@ -68,14 +68,14 @@ function update_station_data(station, new_data)
 
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     ------@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
-    local old_type, old_subtype, old_reversed = unpack_station_constant(control.circuit_condition.constant or 1)
-    local type, network, item, subtype, train_limit, reversed =
+    local old_type, old_subinfo, old_reversed = unpack_station_constant(control.circuit_condition.constant or 1)
+    local type, network, item, subinfo, train_limit, reversed =
         new_data.type or old_type, new_data.network or control.stopped_train_signal,
-        new_data.item or control.priority_signal, new_data.subtype or old_subtype,
+        new_data.item or control.priority_signal, new_data.subinfo or old_subinfo,
         new_data.train_limit or station_entity.trains_limit, new_data.reversed_shunting or old_reversed
 
     local needs_update = type ~= old_type or network ~= control.stopped_train_signal or
-                         item ~= control.priority_signal or subtype ~= old_subtype or
+                         item ~= control.priority_signal or subinfo ~= old_subinfo or
                          train_limit ~= station_entity.trains_limit or reversed ~= old_reversed
 
     if not needs_update then return true end
@@ -86,7 +86,7 @@ function update_station_data(station, new_data)
 
     local circuit = control.circuit_condition
     ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    circuit.constant = pack_station_constant(type, subtype, reversed)
+    circuit.constant = pack_station_constant(type, subinfo, reversed)
     control.circuit_condition = circuit
 
     update_rsad_station_name(station_entity, control, type)

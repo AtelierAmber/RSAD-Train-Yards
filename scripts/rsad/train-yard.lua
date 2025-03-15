@@ -5,6 +5,7 @@ local next = next -- Assign local table next for indexing speed
 
 ---@class ShuntingData
 ---@field public current_stage rsad_shunting_stage
+---@field public pickup_info uint
 
 ---@see create_train_yard
 ---@class TrainYard
@@ -66,7 +67,7 @@ end
 ---@param self TrainYard
 ---@param train_id integer
 local function add_new_shunter(self, train_id)
-    self.shunter_trains[train_id] = {current_stage = rsad_shunting_stage.available}
+    self.shunter_trains[train_id] = {current_stage = rsad_shunting_stage.available, pickup_info = 0}
 end
 
 ---@param self TrainYard
@@ -96,7 +97,7 @@ local function add_or_update_station(self, station)
     if not success or not data.type then return false end
 
     if data.type == rsad_station_type.turnabout then
-        self[data.type][data.subtype] = station
+        self[data.type][data.subinfo] = station
     elseif data.type == rsad_station_type.import then
         if data.item and data.item.name then
             self[data.type][data.item.name] = self[data.type][data.item.name] or {}

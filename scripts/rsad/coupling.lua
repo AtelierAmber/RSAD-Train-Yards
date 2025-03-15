@@ -22,7 +22,7 @@ function rsad_controller.attempt_couple_at_station(self, train, station, count)
     train.schedule = schedule
     if schedule then train.go_to_station(schedule.current+1) end
 
-    if count and (old_train_length + count) < table_size(train.carriages) then
+    if count and (old_train_length + count) < table_size(train.carriages) then --- Start Distanced Disconnect if there are more wagons than needed
         local connected_stock = front_stock.get_connected_rolling_stock(connect_dir)
         if not connected_stock then return false end
         self.scheduler:move_train_by_wagon_count(train, connected_stock, count * ((connected_stock.is_headed_to_trains_front and -1) or 1), signal_hash(station_data.network) or "", station)

@@ -19,7 +19,7 @@ queue = require("__flib__.queue")
 
 ---@class PendingChange
 ---@field public station RSADStation
----@field public create_schedule fun(yard:TrainYard, ...:any): ScheduleRecord[]
+---@field public create_schedule fun(yard:TrainYard, ...:any): ScheduleRecord[], ShuntingData
 
 ---@class scheduler
 scheduler = {
@@ -101,7 +101,7 @@ end
 
 ---@param yard TrainYard
 ---@param requester_station RSADStation
----@return ScheduleRecord[]?
+---@return ScheduleRecord[]?, ShuntingData?
 local function item_request_schedule(yard, requester_station)
     ---Create request station record
     local data_success, station_entity, station_data = get_station_data(requester_station)
@@ -111,6 +111,8 @@ local function item_request_schedule(yard, requester_station)
     local records = {
         [1] = request_record
     }
+    ---@type ShuntingData
+    local new_data = { current_stage = rsad_shunting_stage.delivery, pickup_info = station_data.subinfo } 
     ---Check for turnabout
     local turnabout_station = yard[rsad_station_type.turnabout][rsad_shunting_stage.delivery]
     local turnabout_record = nil
@@ -126,8 +128,8 @@ local function item_request_schedule(yard, requester_station)
     if data_success then
         table.insert(records, 1, default_target_record(input_station, station_data.reversed_shunting))
     end
-
-    return records
+    
+    return records, new_data
 end
 
 ---@param self scheduler
@@ -164,7 +166,7 @@ end
 
 ---@param yard TrainYard
 ---@param removal_station RSADStation
----@return ScheduleRecord[]?
+---@return ScheduleRecord[]?, rsad_shunting_stage?
 local function remove_wagon_scheule(yard, removal_station)
     local data_success, station_entity, station_data = get_station_data(removal_station)
     if not data_success then return nil end
@@ -226,15 +228,18 @@ end
 
 ---@param self scheduler
 ---@param train LuaTrain
----@param return_depot RSADStation?
-function scheduler.check_and_return_shunter(self, train, return_depot)
+---@param yard TrainYard
+function scheduler.check_and_return_shunter(self, train, yard)
     local schedule = train.schedule
+    local return_depot = select(2, next(yard[rsad_station_type.shunting_depot]))
     if schedule and schedule.current == #schedule.records and return_depot then
         local records = {
             [1] = default_target_record(return_depot, false)
         }
         train.schedule = {current = 1, records = records}
         train.manual_mode = false
+        yard.shunter_trains[train.id].current_stage = rsad_shunting_stage.return_to_depot
+        yard.shunter_trains[train.id].pickup_info = 0
     end
 end
 
@@ -251,7 +256,7 @@ function scheduler.update(self)
     if not yard then goto tick_loop end
 
     ---Try to create schedule
-    local records = change.create_schedule(yard, change.station)
+    local records, new_data = change.create_schedule(yard, change.station)
     if not records then goto tick_loop end
     ---@type TrainSchedule
     local schedule = { current = 1, records = records}
@@ -277,7 +282,7 @@ function scheduler.update(self)
         train.schedule = schedule
         train.manual_mode = false
 
-        shunters[train.id].current_stage = rsad_shunting_stage.delivery
+        shunters[train.id] = new_data
         change.station.assignments  = change.station.assignments + 1
         return true
     end

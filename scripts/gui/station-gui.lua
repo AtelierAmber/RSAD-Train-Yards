@@ -148,8 +148,8 @@ function handle_network(e)
 
 	local signal = element.elem_value --[[@as SignalID?]]
     if signal and entity.name ~= "entity-ghost" then
-        local found, station = rsad_controller:get_or_create_station(entity, signal)
-        if found and station then
+        local _, station = rsad_controller:get_or_create_station(entity, signal)
+        if station then
             rsad_controller:migrate_station(station, signal)
         end
     end
@@ -374,8 +374,8 @@ local function shunting_switch(entity, reversed) return {
     }
 } end
 ---@param entity LuaEntity
----@param subtype integer
-local function subtype_drop_down(entity, subtype) return {
+---@param subinfo integer
+local function subtype_drop_down(entity, subinfo) return {
     type = "flow",
     name = "vflow_subtype",
     direction = "vertical",
@@ -402,7 +402,7 @@ local function subtype_drop_down(entity, subtype) return {
                     style_mods = { },
                     handler = handle_turnabout_drop_down,
                     tags = { id = entity.unit_number },
-                    selected_index = ((subtype >= rsad_shunting_stage.sort_imports and subtype < rsad_shunting_stage.return_to_depot) and subtype) or 0,
+                    selected_index = ((subinfo >= rsad_shunting_stage.sort_imports and subinfo < rsad_shunting_stage.return_to_depot) and subinfo) or 0,
                     items = {
                         { "rsad-gui.turnabout-phase.phase-1" },
                         { "rsad-gui.turnabout-phase.phase-2" },
@@ -460,8 +460,8 @@ local function train_limit_bar(entity) return {
     }
 } end
 ---@param entity LuaEntity
----@param subtype integer
-local function cargo_limit_bar(entity, subtype) return {
+---@param subinfo integer
+local function cargo_limit_bar(entity, subinfo) return {
     type = "flow",
     name = "vflow_cargo_limit",
     direction = "vertical",
@@ -489,7 +489,7 @@ local function cargo_limit_bar(entity, subtype) return {
                     name = "slider",
                     handler = handle_cargo_limit,
                     tags = { id = entity.unit_number },
-                    value = subtype,
+                    value = subinfo,
                     minimum_value = 1,
                     maximum_value = max_train_limit
                 },
@@ -499,7 +499,7 @@ local function cargo_limit_bar(entity, subtype) return {
                     style_mods = { width = 35},
                     handler = handle_cargo_limit,
                     tags = { id = entity.unit_number },
-                    text = tostring(subtype),
+                    text = tostring(subinfo),
                     numeric = true
                 }
             }
@@ -624,10 +624,10 @@ local function item_selection(entity, item, switch) return {
 ---@param network SignalID?
 ---@param item SignalID?
 ---@param reversed boolean
----@param subtype integer
+---@param subinfo integer
 ---@param item_switch string
 ---@return flib.GuiElemDef
-function station_gui(entity, player, selected_index, network, item, reversed, subtype, item_switch) return {
+function station_gui(entity, player, selected_index, network, item, reversed, subinfo, item_switch) return {
     type = "frame",
     direction = "vertical",
     name = names.gui.rsad_station,
@@ -682,11 +682,11 @@ function station_gui(entity, player, selected_index, network, item, reversed, su
                     ---Reversed Shunting switch
                     shunting_switch(entity, reversed),
                     ---Subtype section
-                    subtype_drop_down(entity, subtype),
+                    subtype_drop_down(entity, subinfo),
                     ---Train Limit slider
                     train_limit_bar(entity),
                     ---Cargo Limit slider
-                    cargo_limit_bar(entity, subtype),
+                    cargo_limit_bar(entity, subinfo),
                     --Item
                     item_selection(entity, item, item_switch)
                 }
@@ -697,21 +697,21 @@ function station_gui(entity, player, selected_index, network, item, reversed, su
 
 
 ---@param entity LuaEntity
----@return uint selected_type, SignalID? network, SignalID? item, uint subtype, boolean reversed
+---@return uint selected_type, SignalID? network, SignalID? item, uint subinfo, boolean reversed
 function get_station_gui_settings(entity)
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     ------@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
     local constant = control.circuit_condition.constant or 0
     local type = bit32.extract(constant, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH)
-    local subtype = bit32.extract(constant, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
+    local subinfo = bit32.extract(constant, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
     local reversed = bit32.extract(constant, SHUNTING_DIRECTION, SHUNTING_DIRECTION_WIDTH)
-	return  type + 1, control.stopped_train_signal, control.priority_signal, subtype, reversed == 1
+	return  type + 1, control.stopped_train_signal, control.priority_signal, subinfo, reversed == 1
 end
 
 function open_station_gui(rootgui, entity, player)
-    local selected_type, network, item, subtype, reversed = get_station_gui_settings(entity)
+    local selected_type, network, item, subinfo, reversed = get_station_gui_settings(entity)
     local item_switch = (item and (((item.type == "fluid") and "right") or (not item.type and "left"))) or "none" 
-    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item, reversed, subtype, item_switch)})
+    local _, mainscreen = flib_gui.add(rootgui, {station_gui(entity, player, selected_type, network, item, reversed, subinfo, item_switch)})
     mainscreen.frame.vflow_main.preview_frame.preview.entity = entity
     mainscreen.titlebar.drag_target = mainscreen
     mainscreen.titlebar.titlebar_label.caption = {"", "RSAD ", {"rsad-gui.station-types.station-" .. (selected_type-1)}, " Station"}

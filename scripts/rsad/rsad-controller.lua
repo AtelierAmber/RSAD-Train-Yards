@@ -246,8 +246,8 @@ function rsad_controller.decommision_station_from_yard(self, station, keep_netwo
 
     if not keep_network then
         decommision_station(station)
+        self.stations[station.unit_number] = nil
     end
-    self.stations[station.unit_number] = nil
 end
 
 ---comment
@@ -260,6 +260,7 @@ function rsad_controller.migrate_station(self, station, new_network)
     if not new_yard then return false end
     
     self:decommision_station_from_yard(station)
+    self.stations[station.unit_number] = station
     return new_yard:add_or_update_station(station)
 end
 
@@ -297,7 +298,7 @@ function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
             if is_shunter then
                 if data.type == rsad_station_type.import then
                     if train_data.current_stage == rsad_shunting_stage.delivery then
-                        self:attempt_couple_at_station(train, station, 1)
+                        self:attempt_couple_at_station(train, station, train_data.pickup_info)
                     elseif train_data.current_stage == rsad_shunting_stage.sort_imports then
                         local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
                         if not decoupled or not new_train then
@@ -314,7 +315,7 @@ function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
                         return
                     end
                     train = new_train
-                    self.scheduler:check_and_return_shunter(train, select(2, next(yard[rsad_station_type.shunting_depot])))
+                    self.scheduler:check_and_return_shunter(train, yard)
                     station.assignments = 0
                 end
             else
