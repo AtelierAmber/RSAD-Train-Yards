@@ -47,6 +47,16 @@ function get_front_stock(train, station_entity)
     if front_dist < back_dist then return train.front_stock, defines.rail_direction.front end
     return train.back_stock, defines.rail_direction.back
 end
+---@param p MapPosition
+---@param e1 LuaEntity
+---@param e2 LuaEntity
+---@return LuaEntity
+function get_closest(p, e1, e2)
+    local e1_dist = position_distance(p, e1.position)
+    local e2_dist = position_distance(p, e2.position)
+    if e1_dist < e2_dist then return e1 end
+    return e2
+end
 
 ---@param train LuaTrain
 ---@return LuaEntity entity, defines.rail_direction front_direction

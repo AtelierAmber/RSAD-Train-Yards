@@ -58,7 +58,7 @@ local modal_visibilities = {
     [rsad_station_type.request] = { item = true,  direction = true, turnabout = false, cargo = true },
     [rsad_station_type.import_staging] = { item = false,  direction = true, turnabout = false, cargo = true },
     [rsad_station_type.import] = { item = true,  direction = true, turnabout = false, cargo = true },
-    [rsad_station_type.empty_staging] = { item = false,  direction = true, turnabout = false, cargo = true },
+    [rsad_station_type.empty_staging] = { item = false,  direction = false, turnabout = false, cargo = true },
     [rsad_station_type.empty_pickup] = { item = false,  direction = true, turnabout = false, cargo = false },
 }
 

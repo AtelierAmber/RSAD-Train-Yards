@@ -10,14 +10,18 @@ data:extend{
     type = "int-setting",
     name = "rsad-station-max-train-limit",
     setting_type = "startup",
-    default_value = 4,
-    order = "a"
+    minimum_value = 1,
+    maximum_value = 16,
+    default_value = 8,
+    order = "b"
   },
   {
     type = "int-setting",
     name = "rsad-station-max-cargo-limit",
     setting_type = "startup",
-    default_value = 4,
-    order = "a"
+    minimum_value = 1,
+    maximum_value = 255,
+    default_value = 8,
+    order = "c"
   },
 }

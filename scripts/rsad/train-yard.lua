@@ -17,7 +17,7 @@ local next = next -- Assign local table next for indexing speed
 ---@field public rsad_station_type.request {[uint]: string} --- Maps RSADStation to their item request
 ---@field public rsad_station_type.empty_staging {[uint]: RSADStation}
 ---@field public rsad_station_type.empty_pickup {[uint]: RSADStation}
----@field public shunter_trains {[uint]: ShuntingData} --- BOUND TO STORAGE
+---@field public shunter_trains {[uint]: ShuntingData}
 ---Functions
 ---@field public add_or_update_station fun(self: self, station: RSADStation): boolean --- Adds the station to the relevant array. Returns success
 ---@field public remove_station fun(self: self, station: RSADStation) --- Removes the station from yard
@@ -80,10 +80,11 @@ end
 ---@param old_id integer
 ---@param new_id integer
 local function redefine_shunter(self, old_id, new_id)
+    if old_id == new_id then return end
     local old = self.shunter_trains[old_id]
     if not old then return end
-    self.shunter_trains[new_id] = old
     self.shunter_trains[old_id] = nil
+    self.shunter_trains[new_id] = old
 end
 
 --- Adds the station to the relevant array or modifies an existing station to a new designation
@@ -140,8 +141,12 @@ local function update(self, controller)
             if not station then goto continue end
             local data_success, station_entity, data = get_station_data(station)
             if station.parked_train then
-                local contents = game.train_manager.get_train_by_id(station.parked_train).get_contents()
-                if not contents or next(contents) == nil then
+                local parked_train = game.train_manager.get_train_by_id(station.parked_train)
+                if not parked_train then station.parked_train = nil goto continue end
+                local contents = parked_train.get_contents()
+                if not contents or next(contents) == nil -- Check if cargo is empty
+                and (data_success and ((data.train_limit and station.assignments < data.train_limit) or station.assignments < 1)) -- Check for already requested
+                and next(self[rsad_station_type.empty_staging]) ~= nil then -- Make sure we have a staging station for the empty wagons 
                     local schedule_success, error = controller.scheduler:queue_shunt_wagon_to_empty(station)
                     if not schedule_success and error then
                         game.print("Scheduling error code " .. error .. " at station " .. station.unit_number .. ". Please report this with the log file to the mod developer.")
@@ -151,7 +156,8 @@ local function update(self, controller)
                     end
                 end
             elseif not station.parked_train
-                   and (data_success and ((data.train_limit and station.assignments < data.train_limit) or station.assignments < 1)) then -- Check for already requested
+                   and (data_success and ((data.train_limit and station.assignments < data.train_limit) or station.assignments < 1)) -- Check for already requested
+                   and self[rsad_station_type.import][item] and next(self[rsad_station_type.import][item]) ~= nil then -- Make sure we have an import station for this request
 
                 local schedule_success, error = controller.scheduler:queue_station_request(station)
                 if not schedule_success and error then

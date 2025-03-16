@@ -5,6 +5,7 @@ require("scripts.util.events")
 
 local ticks_per_update = math.floor(360/settings.startup["rsad-station-update-rate"].value) + 1
 local max_train_limit = settings.startup["rsad-station-max-train-limit"].value --[[@as integer]]
+local max_cargo_limit = settings.startup["rsad-station-max-cargo-limit"].value --[[@as integer]]
 
 ---@type string?
 active_yard = nil
@@ -71,10 +72,23 @@ function rsad_controller.__on_train_state_change(self, train, old_state)
             local record = schedule and schedule.records[schedule.current]
             local rail = record and record.rail
             if not record or not rail then return end
-            local stop = rail and rail.get_rail_segment_stop(defines.rail_direction.front)
+            local seek_direction = (record.rail_direction == defines.rail_direction.front and defines.rail_direction.back) or defines.rail_direction.front
+            local stop = rail.get_rail_segment_stop(seek_direction)
             if stop then 
                 station = self.stations[stop.unit_number]
-            else return end
+            else
+                local rail_end = rail.get_rail_end(seek_direction)
+                rail_end.flip_direction()
+                for i = 1, max_cargo_limit, 1 do
+                    rail_end.move_to_segment_end()
+                    stop = rail_end.rail.get_rail_segment_stop(rail_end.direction)
+                    if stop then break end
+                    rail_end.move_natural()
+                end
+                if stop then 
+                    station = self.stations[stop.unit_number]
+                else return end
+            end
         end
         self:__on_arrive_at_station(station, train, old_state)
     end
@@ -90,7 +104,7 @@ function rsad_controller.__on_station_destroyed(self, entity)
     if not station then return true end
 
     self:decommision_station_from_yard(station, true)
-    --game.print(serpent.block(self.stations))
+    self.stations[station.unit_number] = nil
     return true
 end
 
@@ -299,6 +313,7 @@ function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
                 if data.type == rsad_station_type.import then
                     if train_data.current_stage == rsad_shunting_stage.delivery then
                         self:attempt_couple_at_station(train, station, train_data.pickup_info)
+                        station.assignments = station.assignments - 1
                     elseif train_data.current_stage == rsad_shunting_stage.sort_imports then
                         local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
                         if not decoupled or not new_train then
@@ -309,14 +324,22 @@ function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
                         ---TODO CONTINUE SORT
                     end
                 elseif data.type == rsad_station_type.request then 
-                    local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
-                    if not decoupled or not new_train then
-                        game.print("Failed to decouple at " .. (train.front_stock and train.front_stock.gps_tag or "nil"))
-                        return
+                    if train_data.current_stage == rsad_shunting_stage.delivery then
+                        local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
+                        if not decoupled or not new_train then
+                            game.print("Failed to decouple at " .. (train.front_stock and train.front_stock.gps_tag or "nil"))
+                            return
+                        end
+                        train = new_train
+                        self.scheduler:check_and_return_shunter(train, yard)
+                        station.assignments = station.assignments - 1
+                    elseif train_data.current_stage == rsad_shunting_stage.clear_empty then
+                        self:attempt_couple_at_station(train, station)
+                        station.assignments = station.assignments - 1
                     end
-                    train = new_train
-                    self.scheduler:check_and_return_shunter(train, yard)
-                    station.assignments = 0
+                elseif data.type == rsad_station_type.empty_staging then
+                    self:attempt_merge_at_station(train, station)
+                    station.assignments = station.assignments - 1
                 end
             else
                 if data.type == rsad_station_type.import then
