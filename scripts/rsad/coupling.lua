@@ -63,7 +63,6 @@ function rsad_controller.attempt_merge_at_station(self, train, station)
                 prev_carriage = i > 1 and carriages[i-1]
                 if prev_carriage and prev_carriage.type == "locomotive" then 
                     disconnect_from = prev_carriage 
-                    stop_distance = stop_distance + ((prev_carriage.prototype.joint_distance / 2))
                 end
             end
         end
@@ -76,6 +75,7 @@ function rsad_controller.attempt_merge_at_station(self, train, station)
     local merged = front_stock.connect_rolling_stock(connect_dir) 
     train = front_stock.train
     if not train then return false end
+    --stop_distance = stop_distance + ((front_stock.prototype.joint_distance / 2))
     station.parked_train = train.id
 
     local connected_length = -train_length
@@ -88,7 +88,6 @@ function rsad_controller.attempt_merge_at_station(self, train, station)
     local path_distance = -connected_length
     local connected_rail_end = train.get_rail_end(connect_dir)
     if not merged then -- Move past station
-        --stop_distance = stop_distance + 2
         connected_rail_end.move_to_segment_end()
         connected_rail_end.move_natural()
     end
@@ -156,11 +155,11 @@ function rsad_controller.decouple_all_cargo(self, train, station, is_shunter)
             local yard = self.train_yards[signal_hash(station_data.network)] --[[@type TrainYard]]
             if yard then
                 yard:redefine_shunter(old_train_id, new_train_id)
-                station.parked_train = wagon.train.id
             end
         end
     end
 
+    station.parked_train = wagon.train.id
     return true, train
 end
 

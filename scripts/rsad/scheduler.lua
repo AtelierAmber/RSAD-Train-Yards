@@ -10,7 +10,7 @@ queue = require("__flib__.queue")
 ---@field public stop_distance number
 ---@field public brake_force number
 ---@field public stopping boolean
----@field public decel number?
+---@field public traveled number
 ---@field public is_forward boolean?
 ---@field public decouple_at LuaEntity
 ---@field public decouple_dir defines.rail_direction
@@ -74,7 +74,7 @@ end
 ---@param station RSADStation
 ---@return boolean
 local function station_is_pending(self, station)
-    for change in queue.iter(self.pending_changes) do
+    for _, change in queue.iter(self.pending_changes) do
         if change.station.unit_number == station.unit_number then 
             return true
         end 
@@ -84,16 +84,16 @@ end
 
 ---@param yard TrainYard
 ---@param item string?
+---@param train_limit integer
 ---@return RSADStation?
-local function get_next_providing_station(yard, item)
+local function get_next_providing_station(yard, item, train_limit)
     local import = yard[rsad_station_type.import][item] --[[@type table<uint, RSADStation>]]
     if not import then return nil end
 
     for unit, station in pairs(import) do
-        if station.parked_train then
+        if station.assignments < train_limit and station.parked_train then
             return station
         end
-        return station
     end
 
     return nil
@@ -125,7 +125,7 @@ local function item_request_schedule(yard, requester_station)
         table.insert(visited_stations, turnabout_station)
     end
     ---Create pickup record
-    local input_station = get_next_providing_station(yard, station_data.item and station_data.item.name)
+    local input_station = get_next_providing_station(yard, station_data.item and station_data.item.name, station_data.train_limit)
     if not input_station then return nil end
     data_success, station_entity, station_data = get_station_data(input_station)
     if data_success then
@@ -335,14 +335,15 @@ end
 ---@param brake_force number
 ---@param speed number --Train Speed
 ---@param destination number --Destination travelled_distance
----@return number force
+---@return boolean braking, number force
 local function calculate_brake_force(traveled, brake_force, speed, destination)
     local brake_distance = speed * speed / brake_force * 0.5
     local brake_start = destination - brake_distance
     local dist_to_start = (brake_start - traveled)
-    local decel = (dist_to_start <= 0.1) and math.max(0, brake_force - (dist_to_start * 0.01)) or 0 
+    local brake_comp = (dist_to_start / brake_distance) * brake_force
+    local decel = ((dist_to_start <= 0) and math.max(0, brake_force + brake_comp)) or 0 
 
-    return decel
+    return (dist_to_start <= 0), decel
 end
 
 ---@param self scheduler
@@ -372,31 +373,36 @@ end
 ---@return boolean --false if no update is needed
 function scheduler.process_script_movement(self)
     local stopped_trains = {}
+    local killed = {}
     local updated = false
     for id, data in pairs(self.scripted_trains) do
         updated = true
+        if not data.train or not data.train.valid then killed[id] = id goto continue end
         local path = data.train.path
         local speed = data.train.speed
         if path then
             data.is_forward = path.is_front
-            local eff_brake = data.brake_force / data.train.weight
-            local decel = calculate_brake_force(path.travelled_distance, eff_brake, speed, data.stop_distance)
-            if decel > (eff_brake * 0.75) then
-                decel = decel * (data.is_forward and 1 or -1) 
-                data.stopping = true
-                data.decel = decel
-                data.train.manual_mode = true
-                speed = speed - decel
-            end
-        elseif data.stopping and data.decel then
-            speed = speed - data.decel
         end
-        if data.stopping and ((speed * (data.is_forward and 1 or -1)) <= 0.0001) then
+        
+        local eff_brake = data.brake_force / data.train.weight
+        local braking, decel = calculate_brake_force(data.traveled, eff_brake, speed, data.stop_distance)
+        if braking or data.stopping then
+            decel = decel * (data.is_forward and 1 or -1) 
+            data.stopping = true
+            data.train.manual_mode = true
+            speed = speed - decel
+        end
+        data.traveled = data.traveled + math.abs(speed)
+        if data.stopping and (math.abs(speed) <= 0.0001) then
             speed = 0
             stopped_trains[id] = data
         end
         data.train.speed = speed
         ::continue::
+    end
+
+    for _, id in pairs(killed) do
+        self.scripted_trains[id] = nil
     end
 
     for id, data in pairs(stopped_trains) do
@@ -438,13 +444,13 @@ function scheduler.move_train_by_wagon_count(self, train, move_from, count, netw
         carriage = next_carriage
         next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
         if not next_carriage then return end
-        local distance = carriage and carriage.prototype.joint_distance + carriage.prototype.connection_distance or 0
-        stop_distance = stop_distance + distance and distance or 0.0
+        local distance = (carriage and carriage.prototype.joint_distance + carriage.prototype.connection_distance) or 0
+        stop_distance = stop_distance + distance
     end
     next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
-    stop_distance = stop_distance + (next_carriage and ((next_carriage.prototype.joint_distance / 2)) or 0.0)
+    --stop_distance = stop_distance + (next_carriage and ((next_carriage.prototype.joint_distance / 2)) or 0.0)
 
-    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, decouple_at = carriage, decouple_dir = direction, network = network, station = station} --[[@type ScriptedTrainDestination]]
+    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, traveled = 0, decouple_at = carriage, decouple_dir = direction, network = network, station = station} --[[@type ScriptedTrainDestination]]
 
     self.scripted_trains[train.id] = train_data
 
@@ -468,7 +474,7 @@ function scheduler.move_train_by_distance(self, train, decouple_at, decouple_dir
     end
     brake_force = brake_force * (brake_multiplier or 1.0)
 
-    local train_data = {train = train, brake_force = brake_force, stop_distance = distance, stopping = false, decouple_at = decouple_at, decouple_dir = decouple_dir, network = network, station = station} --[[@type ScriptedTrainDestination]]
+    local train_data = {train = train, brake_force = brake_force, stop_distance = distance, stopping = false, traveled = 0, decouple_at = decouple_at, decouple_dir = decouple_dir, network = network, station = station} --[[@type ScriptedTrainDestination]]
 
     self.scripted_trains[train.id] = train_data
 
