@@ -1,6 +1,39 @@
 require("scripts.rsad.train-yard")
 require("scripts.rsad.util")
 
+
+---@param self RSAD.Controller
+---@param train LuaTrain
+---@param direction defines.rail_direction
+---@return integer new_train_id
+function rsad_controller.couple_direction(self, train, direction)
+    local old_id = train.id
+    local connecting_stock = direction == (defines.rail_direction.front and train.carriages[0]) or train.carriages[#train.carriages]
+    local connect_dir = connecting_stock.get_connected_rolling_stock(defines.rail_direction.front) and defines.rail_direction.back or defines.rail_direction.front
+    if not connecting_stock.connect_rolling_stock(direction) then log("Failed to couple train [" .. train.id .. "]") return -1 end
+    train = connecting_stock.train
+    if not train then log("Train is nil after coupling train") return -1 end
+    local new_id = train.id
+    
+    local parked_at = self.station_assignments[old_id]
+    if parked_at then
+        self:park_train_at_station(new_id, parked_at)
+    end
+    local shunter_network = self.shunter_networks[old_id]
+    if shunter_network then
+        local yard = self.train_yards[shunter_network]
+        if yard then
+            yard:redefine_shunter(old_id, new_id)
+        end
+    end
+
+    return new_id
+end
+
+function rsad_controller.decouple_at(self, train, )
+
+end
+
 ---@param self RSAD.Controller
 ---@param train LuaTrain
 ---@param station RSAD.Station
@@ -169,7 +202,7 @@ end
 ---@param direction defines.rail_direction
 ---@param network string
 ---@param assign_to RSAD.Station
-function rsad_controller.decouple_at(self, train, at, direction, network, assign_to)
+function rsad_controller.decouple_and_assign(self, train, at, direction, network, assign_to)
     local old_train_id = train.id
     local schedule = train.schedule
     local other = at.get_connected_rolling_stock(direction)

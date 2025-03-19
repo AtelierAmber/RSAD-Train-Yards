@@ -355,7 +355,7 @@ function scheduler.on_scripted_stop(self, data)
         local train_info = yard.shunter_trains[data.train.id]
         if train_info then
             if train_info.current_stage == rsad_shunting_stage.delivery then
-                self.controller:decouple_at(data.train, data.decouple_at, data.decouple_dir, data.network, data.station)
+                self.controller:decouple_and_assign(data.train, data.decouple_at, data.decouple_dir, data.network, data.station)
             elseif train_info.current_stage == rsad_shunting_stage.clear_empty then
                 local decoupled, new_train = self.controller:decouple_all_cargo(data.train, data.station, true)
                 if decoupled then 
@@ -366,7 +366,7 @@ function scheduler.on_scripted_stop(self, data)
             end
         end
     else
-        self.controller:decouple_at(data.train, data.decouple_at, data.decouple_dir, data.network, data.station)
+        self.controller:decouple_and_assign(data.train, data.decouple_at, data.decouple_dir, data.network, data.station)
     end
 end
 

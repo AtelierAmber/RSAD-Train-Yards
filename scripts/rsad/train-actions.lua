@@ -59,7 +59,7 @@ end
 ---@param train_end defines.rail_direction --Train end to couple to
 ---@return int new_train_id
 function RSAD_Actions.exec_couple(train, controller, scope, train_end)
-
+    return controller:couple_direction(train, train_end)
 end
 ---@param train_end defines.rail_direction? --Train end to couple to
 function RSAD_Actions.couple(train_end)

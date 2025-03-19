@@ -22,7 +22,8 @@ rsad_controller = {
     stations = nil, --[[@type table<uint, RSAD.Station>]]
     train_yards = nil, --[[@type table<string, RSAD.TrainYard>]]
     scheduler = scheduler, --[[@type scheduler]]
-    shunter_networks = {} --[[@type table<integer, string>]] -- Train ID to TrainYard network hash
+    shunter_networks = {}, --[[@type table<integer, string>]] -- Train ID to TrainYard network hash
+    station_assignments = {} --[[@type table<integer, RSAD.Station>]] -- Train ID to station it is parked at
 }
 rsad_controller.scheduler.controller = rsad_controller
 
@@ -31,6 +32,11 @@ rsad_controller.scheduler.controller = rsad_controller
 function rsad_controller.__init(self)
     if not storage.stations then storage.stations = {} end
     self.stations = storage.stations
+    for _, station in pairs(self.stations) do
+        if station.parked_train then
+            self.station_assignments[station.parked_train] = station
+        end
+    end
     if not storage.train_yards then storage.train_yards = {} end
     self.train_yards = storage.train_yards or {}
     for network, yard in pairs(storage.train_yards) do
@@ -47,8 +53,18 @@ end
 ---@param self RSAD.Controller
 function rsad_controller.__load(self)
     self.stations = storage.stations or {}
+    for _, station in pairs(self.stations) do
+        if station.parked_train then
+            self.station_assignments[station.parked_train] = station
+        end
+    end
     self.train_yards = storage.train_yards or {}
     self.scheduler.scripted_trains = storage.scripted_trains or {}
+    for network, yard in pairs(storage.train_yards) do
+        for id, info in pairs(yard.shunter_trains) do
+            self.shunter_networks[id] = network
+        end
+    end
 end
 
 ---@package
@@ -314,13 +330,35 @@ function rsad_controller.remove_shunter(self, train_id)
     end
 end
 
+---Free up this station's parking spot
+---@param self RSAD.Controller
+---@param station RSAD.Station
+function rsad_controller.free_parked_station(self, station)
+    if station.parked_train then
+        self.station_assignments[station.parked_train] = nil
+        station.parked_train = nil
+    end
+end
+
+---Register a train as parked to an RSAD.Station
+---@param self RSAD.Controller
+---@param train_id integer
+---@param station RSAD.Station
+function rsad_controller.park_train_at_station(self, train_id, station)
+    if station.parked_train then
+        self.station_assignments[station.parked_train] = nil
+    end
+    self.station_assignments[train_id] = station
+    station.parked_train = train_id
+end
+
 ---@package
 ---@param self RSAD.Controller
 ---@param station RSAD.Station
 ---@param train LuaTrain
 ---@param old_state defines.train_state
 function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
-    local success, station_entity, data = get_station_data(station)
+    local success, station_entity,  = get_station_data(station)
     if not success then return end
     local yard = self:get_train_yard_or_nil(data.network)
     if yard then
