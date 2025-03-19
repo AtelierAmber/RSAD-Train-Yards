@@ -26,7 +26,7 @@ local next = next -- Assign local table next for indexing speed
 ---@field public add_new_shunter fun(self:self, train_id: integer)
 ---@field public remove_shunter fun(self:self, train_id: integer)
 ---@field public redefine_shunter fun(self:self, old_id: integer, new_id: integer)
----@field public update fun(self: self, controller: rsad_controller)
+---@field public update fun(self: self, controller: RSAD.Controller)
 
 --- TODO: Make custom schedules possible
 
@@ -130,7 +130,7 @@ end
 
 ---Checks for empty wagons, submits requests, and manages idle shunters
 ---@param self TrainYard
----@param controller rsad_controller
+---@param controller RSAD.Controller
 ---@return boolean ---True if tick was processed and blocks other updates. False if update should continue
 local function update(self, controller)
     -- Update checks below are sorted by importance

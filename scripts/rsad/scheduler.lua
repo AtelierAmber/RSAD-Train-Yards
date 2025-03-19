@@ -1,5 +1,6 @@
 require("scripts.rsad.station")
 require("scripts.rsad.util")
+require("scripts.rsad.train-actions")
 
 ---@type flib_queue
 queue = require("__flib__.queue")
@@ -23,7 +24,7 @@ queue = require("__flib__.queue")
 
 ---@class scheduler
 scheduler = {
-    controller = nil, --[[@type rsad_controller]]
+    controller = nil, --[[@type RSAD.Controller]]
     scripted_trains = {}, --[[@type table<uint, ScriptedTrainDestination>]]
     pending_changes = queue.new() --[[@type flib.Queue<PendingChange>]]
 }

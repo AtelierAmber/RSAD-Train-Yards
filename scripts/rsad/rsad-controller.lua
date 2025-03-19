@@ -10,35 +10,49 @@ local max_cargo_limit = settings.startup["rsad-station-max-cargo-limit"].value -
 ---@type string?
 active_yard = nil
 
-local next = next -- Assign local table next for indexing speed
+--#region Function Localization for indexing speed
 
----@class rsad_controller
+local next = next
+local pairs = pairs
+
+--#endregion
+
+---@class RSAD.Controller
 rsad_controller = {
     stations = nil, --[[@type table<uint, RSADStation>]]
     train_yards = nil, --[[@type table<string, TrainYard>]]
     scheduler = scheduler, --[[@type scheduler]]
+    shunter_networks = {} --[[@type table<integer, string>]] -- Train ID to TrainYard network hash
 }
 rsad_controller.scheduler.controller = rsad_controller
 
----@param self rsad_controller
+---@package
+---@param self RSAD.Controller
 function rsad_controller.__init(self)
     if not storage.stations then storage.stations = {} end
     self.stations = storage.stations
     if not storage.train_yards then storage.train_yards = {} end
     self.train_yards = storage.train_yards or {}
+    for network, yard in pairs(storage.train_yards) do
+        for id, info in pairs(yard.shunter_trains) do
+            self.shunter_networks[id] = network
+        end
+    end
     storage.needs_tick = storage.needs_tick or false
     if not storage.scripted_trains then storage.scripted_trains = {} end
     self.scheduler.scripted_trains = storage.scripted_trains or {}
 end
 
----@param self rsad_controller
+---@package
+---@param self RSAD.Controller
 function rsad_controller.__load(self)
     self.stations = storage.stations or {}
     self.train_yards = storage.train_yards or {}
     self.scheduler.scripted_trains = storage.scripted_trains or {}
 end
 
----@param self rsad_controller
+---@package
+---@param self RSAD.Controller
 ---@param tick_data NthTickEventData
 function rsad_controller.__nth_tick(self, tick_data)
     --- Check first if any shunting orders need to be issued
@@ -60,7 +74,8 @@ function rsad_controller.__nth_tick(self, tick_data)
     if not active_yard then active_yard = next(self.train_yards, active_yard) end
 end
 
----@param self rsad_controller
+---@package
+---@param self RSAD.Controller
 ---@param train LuaTrain
 ---@param old_state defines.train_state
 function rsad_controller.__on_train_state_change(self, train, old_state)
@@ -94,7 +109,8 @@ function rsad_controller.__on_train_state_change(self, train, old_state)
     end
 end
 
----@param self rsad_controller
+---@package
+---@param self RSAD.Controller
 ---@param entity LuaEntity
 ---@return boolean
 function rsad_controller.__on_station_destroyed(self, entity)
@@ -108,7 +124,8 @@ function rsad_controller.__on_station_destroyed(self, entity)
     return true
 end
 
----@param self rsad_controller
+---@package
+---@param self RSAD.Controller
 ---@param entity LuaEntity
 ---@return boolean
 function rsad_controller.__on_station_built(self, entity)
@@ -130,7 +147,8 @@ function rsad_controller.__on_station_built(self, entity)
     return true
 end
 
----@param self rsad_controller
+---@package
+---@param self RSAD.Controller
 ---@param train LuaTrain?
 ---@return boolean
 function rsad_controller.__on_train_removed(self, train)
@@ -145,6 +163,7 @@ function rsad_controller.__on_train_removed(self, train)
     return true
 end
 
+---@package
 ---@param entity LuaEntity
 function rsad_controller.__on_paste_settings(self, entity)
     if entity.name == "entity-ghost" or entity.name ~= names.entities.rsad_station then return end
@@ -164,7 +183,7 @@ function rsad_controller.__main_tick(self)
     if not storage.needs_tick then script.on_event(defines.events.on_tick, nil) end --Unregister to save UPS
 end
 
----@param self rsad_controller
+---@param self RSAD.Controller
 function rsad_controller.register_events(self)
    events.register_init(function() self:__init() end)
    events.register_load(function() self:__load() end)
@@ -178,7 +197,7 @@ function rsad_controller.register_events(self)
    script.on_event(defines.events.on_player_created, function(data) self:__load() end)
 end
 
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param signal SignalID?
 ---@return TrainYard?
 function rsad_controller.get_train_yard_or_nil(self, signal)
@@ -187,7 +206,7 @@ function rsad_controller.get_train_yard_or_nil(self, signal)
 end
 
 ---Get or creates a train yard with specified signal
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param signal SignalID?
 ---@return TrainYard? yard
 function rsad_controller.get_or_create_train_yard(self, signal)
@@ -199,7 +218,7 @@ function rsad_controller.get_or_create_train_yard(self, signal)
 end
 
 ---Returns false if needed to create, true if it was found
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param entity LuaEntity
 ---@param network SignalID?
 ---@return boolean, RSADStation? 
@@ -215,7 +234,7 @@ function rsad_controller.get_or_create_station(self, entity, network)
 end
 
 --- Creates station and assignes it to a train yard
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param entity LuaEntity
 ---@param network SignalID
 ---@return RSADStation?
@@ -236,7 +255,7 @@ function rsad_controller.construct_station(self, entity, network)
 end
 
 ---comment
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param station RSADStation
 ---@param keep_network boolean? --If true, it will keep the network assigned in the station. Used only for destroying
 function rsad_controller.decommision_station_from_yard(self, station, keep_network)
@@ -279,7 +298,7 @@ function rsad_controller.migrate_station(self, station, new_network)
 end
 
 ---comment
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param train_id integer
 ---@param yard TrainYard
 function rsad_controller.assign_shunter(self, train_id, yard)
@@ -287,7 +306,7 @@ function rsad_controller.assign_shunter(self, train_id, yard)
 end
 
 ---comment
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param train_id integer
 function rsad_controller.remove_shunter(self, train_id)
     for _, yard in pairs(self.train_yards) do
@@ -295,7 +314,8 @@ function rsad_controller.remove_shunter(self, train_id)
     end
 end
 
----@param self rsad_controller
+---@package
+---@param self RSAD.Controller
 ---@param station RSADStation
 ---@param train LuaTrain
 ---@param old_state defines.train_state

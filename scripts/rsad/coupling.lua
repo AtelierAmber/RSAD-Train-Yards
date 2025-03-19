@@ -1,7 +1,7 @@
 require("scripts.rsad.train-yard")
 require("scripts.rsad.util")
 
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param train LuaTrain
 ---@param station RSADStation
 ---@param count uint? -- If nil will couple all wagons
@@ -41,7 +41,7 @@ function rsad_controller.attempt_couple_at_station(self, train, station, count)
     return true
 end
 
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param train LuaTrain
 ---@param station RSADStation
 ---@return boolean success
@@ -116,7 +116,7 @@ function rsad_controller.attempt_merge_at_station(self, train, station)
     return true
 end
 
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param train LuaTrain
 ---@param station RSADStation
 ---@return boolean success, LuaTrain new_train
@@ -163,7 +163,7 @@ function rsad_controller.decouple_all_cargo(self, train, station, is_shunter)
     return true, train
 end
 
----@param self rsad_controller
+---@param self RSAD.Controller
 ---@param train LuaTrain
 ---@param at LuaEntity
 ---@param direction defines.rail_direction
