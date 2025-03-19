@@ -3,24 +3,24 @@ require("scripts.rsad.station")
 
 local next = next -- Assign local table next for indexing speed
 
----@class ShuntingData
+---@class RSAD.TrainYard.ShuntingData
 ---@field public current_stage rsad_shunting_stage
 ---@field public pickup_info uint
 
 ---@see create_train_yard
----@class TrainYard
+---@class RSAD.TrainYard
 ---@field public network SignalID
----@field public rsad_station_type.shunting_depot {[uint]: RSADStation} 
----@field public rsad_station_type.turnabout {[rsad_shunting_stage]: RSADStation}
----@field public rsad_station_type.import_staging {[uint]: RSADStation}
----@field public rsad_station_type.import {[string]: {[uint]: RSADStation}} -- Maps item to RSADStations
+---@field public rsad_station_type.shunting_depot {[uint]: RSAD.Station} 
+---@field public rsad_station_type.turnabout {[rsad_shunting_stage]: RSAD.Station}
+---@field public rsad_station_type.import_staging {[uint]: RSAD.Station}
+---@field public rsad_station_type.import {[string]: {[uint]: RSAD.Station}} -- Maps item to RSADStations
 ---@field public rsad_station_type.request {[uint]: string} --- Maps RSADStation to their item request
----@field public rsad_station_type.empty_staging {[uint]: RSADStation}
----@field public rsad_station_type.empty_pickup {[uint]: RSADStation}
----@field public shunter_trains {[uint]: ShuntingData}
+---@field public rsad_station_type.empty_staging {[uint]: RSAD.Station}
+---@field public rsad_station_type.empty_pickup {[uint]: RSAD.Station}
+---@field public shunter_trains {[uint]: RSAD.TrainYard.ShuntingData}
 ---Functions
----@field public add_or_update_station fun(self: self, station: RSADStation): boolean --- Adds the station to the relevant array. Returns success
----@field public remove_station fun(self: self, station: RSADStation) --- Removes the station from yard
+---@field public add_or_update_station fun(self: self, station: RSAD.Station): boolean --- Adds the station to the relevant array. Returns success
+---@field public remove_station fun(self: self, station: RSAD.Station) --- Removes the station from yard
 ---@field public is_empty fun(self: self): boolean --- Returns true if no stations exist in this yard
 ---@field public decommision fun(self: self) --- Returns true if no stations exist in this yard
 ---@field public add_new_shunter fun(self:self, train_id: integer)
@@ -31,8 +31,8 @@ local next = next -- Assign local table next for indexing speed
 --- TODO: Make custom schedules possible
 
 --- Removes the station if it exists from all registers
----@param self TrainYard
----@param station RSADStation
+---@param self RSAD.TrainYard
+---@param station RSAD.Station
 local function remove_station(self, station)
     self[rsad_station_type.shunting_depot][station.unit_number] = nil
     for stage, sta in pairs(self[rsad_station_type.turnabout]) do
@@ -52,7 +52,7 @@ local function remove_station(self, station)
     self[rsad_station_type.empty_pickup][station.unit_number] = nil
 end
 
----@param self TrainYard
+---@param self RSAD.TrainYard
 ---@return boolean
 local function is_empty(self)
     return next(self[rsad_station_type.shunting_depot]) == nil and
@@ -64,19 +64,19 @@ local function is_empty(self)
            next(self[rsad_station_type.empty_pickup]) == nil
 end
 
----@param self TrainYard
+---@param self RSAD.TrainYard
 ---@param train_id integer
 local function add_new_shunter(self, train_id)
     self.shunter_trains[train_id] = {current_stage = rsad_shunting_stage.available, pickup_info = 0}
 end
 
----@param self TrainYard
+---@param self RSAD.TrainYard
 ---@param train_id integer
 local function remove_shunter(self, train_id)
     self.shunter_trains[train_id] = nil
 end
 
----@param self TrainYard
+---@param self RSAD.TrainYard
 ---@param old_id integer
 ---@param new_id integer
 local function redefine_shunter(self, old_id, new_id)
@@ -88,8 +88,8 @@ local function redefine_shunter(self, old_id, new_id)
 end
 
 --- Adds the station to the relevant array or modifies an existing station to a new designation
----@param self TrainYard
----@param station RSADStation
+---@param self RSAD.TrainYard
+---@param station RSAD.Station
 ---@return boolean success
 local function add_or_update_station(self, station)
     local success, station_entity, data = get_station_data(station)
@@ -129,7 +129,7 @@ local function decommision_yard()
 end
 
 ---Checks for empty wagons, submits requests, and manages idle shunters
----@param self TrainYard
+---@param self RSAD.TrainYard
 ---@param controller RSAD.Controller
 ---@return boolean ---True if tick was processed and blocks other updates. False if update should continue
 local function update(self, controller)
@@ -190,11 +190,11 @@ script.register_metatable("TrainYardMeta", TrainYardMeta)
 
 ---Creates a new TrainYard object
 ---@param network SignalID
----@return TrainYard
+---@return RSAD.TrainYard
 function create_train_yard(network)
     local hash = signal_hash(network)
     assert(hash, "Could not hash network " .. serpent.line(network))
-    --[[@type TrainYard]]
+    --[[@type RSAD.TrainYard]]
 ---@diagnostic disable-next-line: missing-fields
     local yard = setmetatable({
         network = network,

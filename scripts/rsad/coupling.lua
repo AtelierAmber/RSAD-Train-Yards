@@ -3,7 +3,7 @@ require("scripts.rsad.util")
 
 ---@param self RSAD.Controller
 ---@param train LuaTrain
----@param station RSADStation
+---@param station RSAD.Station
 ---@param count uint? -- If nil will couple all wagons
 ---@return boolean success
 function rsad_controller.attempt_couple_at_station(self, train, station, count)
@@ -43,7 +43,7 @@ end
 
 ---@param self RSAD.Controller
 ---@param train LuaTrain
----@param station RSADStation
+---@param station RSAD.Station
 ---@return boolean success
 function rsad_controller.attempt_merge_at_station(self, train, station)
     local success, entity, station_data = get_station_data(station)
@@ -118,7 +118,7 @@ end
 
 ---@param self RSAD.Controller
 ---@param train LuaTrain
----@param station RSADStation
+---@param station RSAD.Station
 ---@return boolean success, LuaTrain new_train
 function rsad_controller.decouple_all_cargo(self, train, station, is_shunter)
     local start, direction = get_back_cargo(train)
@@ -152,7 +152,7 @@ function rsad_controller.decouple_all_cargo(self, train, station, is_shunter)
         local success, entity, station_data = get_station_data(station)
         ---@diagnostic disable-next-line: missing-return-value
         if success then
-            local yard = self.train_yards[signal_hash(station_data.network)] --[[@type TrainYard]]
+            local yard = self.train_yards[signal_hash(station_data.network)] --[[@type RSAD.TrainYard]]
             if yard then
                 yard:redefine_shunter(old_train_id, new_train_id)
             end
@@ -168,7 +168,7 @@ end
 ---@param at LuaEntity
 ---@param direction defines.rail_direction
 ---@param network string
----@param assign_to RSADStation
+---@param assign_to RSAD.Station
 function rsad_controller.decouple_at(self, train, at, direction, network, assign_to)
     local old_train_id = train.id
     local schedule = train.schedule

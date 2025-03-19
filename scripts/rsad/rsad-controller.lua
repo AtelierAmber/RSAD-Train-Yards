@@ -19,8 +19,8 @@ local pairs = pairs
 
 ---@class RSAD.Controller
 rsad_controller = {
-    stations = nil, --[[@type table<uint, RSADStation>]]
-    train_yards = nil, --[[@type table<string, TrainYard>]]
+    stations = nil, --[[@type table<uint, RSAD.Station>]]
+    train_yards = nil, --[[@type table<string, RSAD.TrainYard>]]
     scheduler = scheduler, --[[@type scheduler]]
     shunter_networks = {} --[[@type table<integer, string>]] -- Train ID to TrainYard network hash
 }
@@ -58,7 +58,7 @@ function rsad_controller.__nth_tick(self, tick_data)
     --- Check first if any shunting orders need to be issued
     if self.scheduler:update() then end
 
-    ---@type TrainYard?
+    ---@type RSAD.TrainYard?
     local yard
     ---@type string?
     local k
@@ -199,7 +199,7 @@ end
 
 ---@param self RSAD.Controller
 ---@param signal SignalID?
----@return TrainYard?
+---@return RSAD.TrainYard?
 function rsad_controller.get_train_yard_or_nil(self, signal)
     local hash = signal_hash(signal)
     return hash and self.train_yards[hash]
@@ -208,7 +208,7 @@ end
 ---Get or creates a train yard with specified signal
 ---@param self RSAD.Controller
 ---@param signal SignalID?
----@return TrainYard? yard
+---@return RSAD.TrainYard? yard
 function rsad_controller.get_or_create_train_yard(self, signal)
     if not signal then return nil end
     local hash = signal_hash(signal)
@@ -221,11 +221,11 @@ end
 ---@param self RSAD.Controller
 ---@param entity LuaEntity
 ---@param network SignalID?
----@return boolean, RSADStation? 
+---@return boolean, RSAD.Station? 
 function rsad_controller.get_or_create_station(self, entity, network)
     local unit_number = entity.unit_number
     
-    local station = self.stations[unit_number] --[[@as RSADStation?]]
+    local station = self.stations[unit_number] --[[@as RSAD.Station?]]
     if not station and network then
         station = self:construct_station(entity, network)
         return false, station
@@ -237,7 +237,7 @@ end
 ---@param self RSAD.Controller
 ---@param entity LuaEntity
 ---@param network SignalID
----@return RSADStation?
+---@return RSAD.Station?
 function rsad_controller.construct_station(self, entity, network)
     local yard = self:get_or_create_train_yard(network)
     if not yard then
@@ -256,7 +256,7 @@ end
 
 ---comment
 ---@param self RSAD.Controller
----@param station RSADStation
+---@param station RSAD.Station
 ---@param keep_network boolean? --If true, it will keep the network assigned in the station. Used only for destroying
 function rsad_controller.decommision_station_from_yard(self, station, keep_network)
     if not station then return end
@@ -268,7 +268,7 @@ function rsad_controller.decommision_station_from_yard(self, station, keep_netwo
 
     local hash = signal_hash(data.network)
     if hash then
-        local yard = data.network and self.train_yards[hash] --[[@as TrainYard?]]
+        local yard = data.network and self.train_yards[hash] --[[@as RSAD.TrainYard?]]
         if yard then
             yard:remove_station(station)
             if yard:is_empty() then
@@ -285,7 +285,7 @@ end
 
 ---comment
 ---am self rsad_controller
----@param station RSADStation
+---@param station RSAD.Station
 ---@param new_network SignalID
 ---@return boolean
 function rsad_controller.migrate_station(self, station, new_network)
@@ -300,7 +300,7 @@ end
 ---comment
 ---@param self RSAD.Controller
 ---@param train_id integer
----@param yard TrainYard
+---@param yard RSAD.TrainYard
 function rsad_controller.assign_shunter(self, train_id, yard)
     yard:add_new_shunter(train_id)
 end
@@ -316,7 +316,7 @@ end
 
 ---@package
 ---@param self RSAD.Controller
----@param station RSADStation
+---@param station RSAD.Station
 ---@param train LuaTrain
 ---@param old_state defines.train_state
 function rsad_controller.__on_arrive_at_station(self, station, train, old_state)

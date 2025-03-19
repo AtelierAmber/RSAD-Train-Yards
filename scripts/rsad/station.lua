@@ -1,7 +1,7 @@
 require("scripts.defines")
 require("scripts.rsad.util")
 
----@class StationData
+---@class RSAD.Station.Data
 ---@field public type rsad_station_type?
 ---@field public network SignalID?
 ---@field public item SignalID?
@@ -11,7 +11,7 @@ require("scripts.rsad.util")
 
 ---@see create_rsad_station
 ---
----@class RSADStation
+---@class RSAD.Station
 ---@field public unit_number uint
 ---@field public assignments uint -- Number of assigned trains to this station
 ---@field public parked_train uint? -- train ID that is currently parked at this station. Wagons without a locomotive also have a train ID. nil if none
@@ -34,8 +34,8 @@ local function pack_station_constant(type, subinfo, reversed)
     return bit32.bor(type, bit32.lshift(reversed and 1 or 0, STATION_TYPE_ID_WIDTH), bit32.lshift(subinfo, STATION_TYPE_ID_WIDTH + SHUNTING_DIRECTION_WIDTH))
 end
 
----@param station RSADStation
----@return boolean success, LuaEntity station_entity, StationData data
+---@param station RSAD.Station
+---@return boolean success, LuaEntity station_entity, RSAD.Station.Data data
 function get_station_data(station)
     local station_entity = station and game.get_entity_by_unit_number(station.unit_number)
 ---@diagnostic disable-next-line: return-type-mismatch
@@ -46,7 +46,7 @@ function get_station_data(station)
 ---@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.53
     local type, subinfo, reversed = unpack_station_constant(control.circuit_condition.constant)
 
-    ---@type StationData
+    ---@type RSAD.Station.Data
     local data = {
         type = type --[[@as rsad_station_type]],
         network = control.stopped_train_signal,
@@ -59,8 +59,8 @@ function get_station_data(station)
     return true, station_entity, data
 end
 
----@param station RSADStation
----@param new_data StationData
+---@param station RSAD.Station
+---@param new_data RSAD.Station.Data
 ---@return boolean success
 function update_station_data(station, new_data)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
@@ -104,14 +104,14 @@ end
 
 ---Creates a new RSADStation object
 ---@param entity LuaEntity
----@return RSADStation station
+---@return RSAD.Station station
 function create_rsad_station(entity)
     entity.trains_limit = 1
     local station = {
         unit_number = entity.unit_number,
         assignments = 0,
         parked_train = nil
-    } --[[@type RSADStation]]
+    } --[[@type RSAD.Station]]
     
     return station
 end
