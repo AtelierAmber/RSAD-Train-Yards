@@ -30,8 +30,49 @@ function rsad_controller.couple_direction(self, train, direction)
     return new_id
 end
 
-function rsad_controller.decouple_at(self, train, )
+---Splits [train] at location of [at] in [direction]. If parked, will assign the [direction] train unless [park_self]
+---@param self RSAD.Controller
+---@param train LuaTrain
+---@param at LuaEntity
+---@param direction defines.rail_direction
+---@param park_self boolean
+---@return integer new_train_id
+function rsad_controller.decouple_at(self, train, at, direction, park_self)
+    local old_id = train.id
+    local schedule = train.schedule
+    local other = at.get_connected_rolling_stock(direction)
+    if at.disconnect_rolling_stock(direction) then  log("Failed to decouple train [" .. train.id .. "]") return -1 end
+    local new_id = at.train.id
+    if not train then log("Train is nil after decoupling train") return -1 end
+    at.train.schedule = schedule
+    at.train.manual_mode = false
 
+    local parked_at = self.station_assignments[old_id]
+    if parked_at then
+        if other and other.train then
+            self:park_train_at_station(other.train.id, parked_at)
+        else 
+            self:park_train_at_station(new_id, parked_at)
+        end
+    end
+    
+    local shunter_network = self.shunter_networks[old_id]
+    if shunter_network then
+        local yard = self.train_yards[shunter_network]
+        if yard then
+            yard:redefine_shunter(old_id, new_id)
+        end
+    end
+
+    return new_id
+end
+
+---Moves a train a certain amount along it's path
+---@param self RSAD.Controller
+---@param train LuaTrain
+---@return AsyncAwait
+function rsad_controller.move_train(self, train, distance)
+    
 end
 
 ---@param self RSAD.Controller

@@ -1,4 +1,5 @@
 require("scripts.defines")
+flib_table = require("__flib__.table") --[[@type flib_table]]
 
 ---@class RSAD.Actions
 RSAD_Actions = {}
@@ -32,11 +33,26 @@ end
 ---@param train LuaTrain
 ---@param controller RSAD.Controller
 ---@param scope RSAD.Actions.Scope
----@param wagon_count integer --Decouple this number of wagons from the train starting from the backmost locomotive if include_locomotives is false
----@param include_locomotives boolean
+---@param wagon_count integer --Decouple offset this number of wagons from the train starting from the backmost locomotive if 
+---by_locomotive is false or backmost carriage if by_locomotive is true or no locomotives; going to the back of the train
+---@param by_locomotive boolean
 ---@return int new_train_id
-function RSAD_Actions.exec_decouple(train, controller, scope, wagon_count, include_locomotives)
-
+function RSAD_Actions.exec_decouple(train, controller, scope, wagon_count, by_locomotive)
+    local carriages = train.carriages
+    local decouple_at = nil
+    if by_locomotive then
+        decouple_at = carriages[math.min(#carriages, wagon_count)]
+    else
+        for i = #carriages, 1, -1 do
+            local carriage = carriages[i]
+            if carriage.type == "locomotive" then
+                decouple_at = carriages[math.min(#carriages, i-(wagon_count))]
+            end
+        end
+    end
+    if not decouple_at then log("Could not decouple " .. wagon_count .. " carriage offset from train with " .. #carriages .. " carriages from rear" .. ((by_locomotive and " locomotive") or ".")) return -1 end
+    local direction = (decouple_at.is_headed_to_trains_front and defines.rail_direction.back) or defines.rail_direction.front
+    return controller:decouple_at(train, decouple_at, direction, false)
 end
 ---Decouple wagons from train
 ---@param wagon_count integer? --Decouple this number of wagons from the train starting from the backmost locomotive if include_locomotives is false

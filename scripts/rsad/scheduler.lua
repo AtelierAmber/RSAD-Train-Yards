@@ -22,7 +22,7 @@ queue = require("__flib__.queue")
 ---@field public station RSAD.Station
 ---@field public create_schedule fun(yard:RSAD.TrainYard, ...:any): ScheduleRecord[], RSAD.TrainYard.ShuntingData, RSAD.Station[]
 
----@class scheduler
+---@class RSAD.Scheduler
 scheduler = {
     controller = nil, --[[@type RSAD.Controller]]
     scripted_trains = {}, --[[@type table<uint, ScriptedTrainDestination>]]
@@ -137,7 +137,7 @@ local function item_request_schedule(yard, requester_station)
     return records, new_data, visited_stations
 end
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@param station RSAD.Station
 ---@return boolean, uint? --- Whether or not the request was successful, error number (nil if successful) 
 function scheduler.queue_station_request(self, station)
@@ -228,7 +228,7 @@ local function remove_wagon_schedule(yard, removal_station)
     return records, new_data, visited_stations
 end
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@param station RSAD.Station
 ---@return boolean, uint? --- Whether or not the request was successful, error number (nil if successful) 
 function scheduler.queue_shunt_wagon_to_empty(self, station)
@@ -257,7 +257,7 @@ end
 
 --#endregion
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@param train LuaTrain
 ---@param yard RSAD.TrainYard
 function scheduler.return_shunter(self, train, yard)
@@ -273,7 +273,7 @@ function scheduler.return_shunter(self, train, yard)
     end
 end
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@param train LuaTrain
 ---@param yard RSAD.TrainYard
 function scheduler.check_and_return_shunter(self, train, yard)
@@ -283,7 +283,7 @@ function scheduler.check_and_return_shunter(self, train, yard)
     end
 end
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@return boolean ---False if no update was necessary. True if an update was processed
 function scheduler.update(self)
     ::tick_loop::
@@ -347,7 +347,7 @@ local function calculate_brake_force(traveled, brake_force, speed, destination)
     return (dist_to_start <= 0), decel
 end
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@param data ScriptedTrainDestination
 function scheduler.on_scripted_stop(self, data)
     local yard = self.controller.train_yards[data.network or ""]
@@ -370,7 +370,7 @@ function scheduler.on_scripted_stop(self, data)
     end
 end
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@return boolean --false if no update is needed
 function scheduler.process_script_movement(self)
     local stopped_trains = {}
@@ -414,14 +414,14 @@ function scheduler.process_script_movement(self)
     return updated
 end
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@return boolean --false if no more needed
 function scheduler.on_tick(self)
     return self:process_script_movement()
 end
 
 ---comment
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@param train LuaTrain
 ---@param move_from LuaEntity --Carriage that marks the destination for [count away] trains
 ---@param count uint --Number of carriages to move. If negative will count in reverse
@@ -459,7 +459,7 @@ function scheduler.move_train_by_wagon_count(self, train, move_from, count, netw
 end
 
 ---comment
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@param train LuaTrain
 ---@param decouple_at LuaEntity -- Which carriage to decouple from
 ---@param decouple_dir defines.rail_direction
@@ -485,7 +485,7 @@ end
 
 --- #region SORTING IMPORT MULTI-INGREDIENT ---
 
----@param self scheduler
+---@param self RSAD.Scheduler
 ---@param incoming LuaTrain
 ---@param station RSAD.Station
 function scheduler.on_receive_multi_import(self, incoming, station)

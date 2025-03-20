@@ -21,7 +21,7 @@ local pairs = pairs
 rsad_controller = {
     stations = nil, --[[@type table<uint, RSAD.Station>]]
     train_yards = nil, --[[@type table<string, RSAD.TrainYard>]]
-    scheduler = scheduler, --[[@type scheduler]]
+    scheduler = scheduler, --[[@type RSAD.Scheduler]]
     shunter_networks = {}, --[[@type table<integer, string>]] -- Train ID to TrainYard network hash
     station_assignments = {} --[[@type table<integer, RSAD.Station>]] -- Train ID to station it is parked at
 }
