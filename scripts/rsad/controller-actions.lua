@@ -84,12 +84,45 @@ function rsad_controller.decouple_at(self, train, at, direction, park_self)
     return new_id
 end
 
----Moves a train a certain amount along it's path
+---Moves a train a [distance] in [direction]
 ---@param self RSAD.Controller
 ---@param train LuaTrain
----@return AsyncAwait
-function rsad_controller.move_train(self, train, distance)
-    
+---@param distance integer
+---@param direction defines.rail_direction
+---@return AsyncAwait|integer
+function rsad_controller.move_train(self, train, distance, direction)
+    local train_end = ((direction == defines.rail_direction.front) and train.front_end) or train.back_end
+    local segment_end = train_end.make_copy()
+    segment_end.move_to_segment_end()
+    segment_end.flip_direction()
+    local path = game.train_manager.request_train_path({starts = {{rail = train_end.rail, direction = train_end.direction, allow_path_within_segment = true}}, goals = {segment_end}, shortest_path = true})
+    if not path.found_path then 
+        log("Could not resolve path past train [" .. train.id .. "] to move through!") 
+        for _, p in pairs(game.connected_players) do p.add_alert(train.front_stock, defines.alert_type.train_no_path) end
+        return -1 
+    end
+    local path_distance = path.total_length
+    segment_end.flip_direction()
+    segment_end.move_natural()
+    local segment_rail = segment_end.rail
+    while segment_rail and path_distance < distance do
+        path_distance = path_distance + segment_rail.get_rail_segment_length()
+        segment_end.move_to_segment_end()
+        segment_end.move_natural()
+        segment_rail = segment_end.rail
+    end
+    if not segment_rail or path_distance <= 0 then 
+        log("Could not find a viable movement path for train [" .. train.id .. "].") 
+        for _, p in pairs(game.connected_players) do p.add_alert(train.front_stock, defines.alert_type.train_no_path) end
+        return -1 
+    end
+
+    local lua_schedule = train.get_schedule()
+    lua_schedule.add_record({index = {schedule_index = 1}, temporary = true, rail = segment_rail, wait_conditions = {{type = "time", ticks = 2}}})
+    lua_schedule.go_to_station(1)
+    --self.scheduler:move_train_by_distance(train, disconnect_from, disconnect_from.is_headed_to_trains_front and defines.rail_direction.front or defines.rail_direction.back, stop_distance, signal_hash(station_data.network) or "", station)
+
+    return {complete = false}
 end
 
 ---@param self RSAD.Controller
