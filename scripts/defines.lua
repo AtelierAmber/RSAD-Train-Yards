@@ -41,4 +41,7 @@ SHUNTING_DIRECTION_WIDTH = 1
 STATION_SUBINFO = 5
 STATION_SUBINFO_WIDTH = 8
 
----@class AsyncAwait<S> : { scope: S, complete: boolean, complete_data: table<any, any>?}
+---@class AsyncAwait
+---@field public scope any?
+---@field public complete boolean
+---@field public complete_data table<any, any>?

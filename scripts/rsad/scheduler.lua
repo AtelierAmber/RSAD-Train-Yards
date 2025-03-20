@@ -1,22 +1,26 @@
 require("scripts.rsad.station")
 require("scripts.rsad.util")
 require("scripts.rsad.train-actions")
+require("scripts.defines")
 
 ---@type flib_queue
 queue = require("__flib__.queue")
+---@type flib_math
+fmath = require("__flib__.math")
+
 -- TODO: Expand to inter-yard deliveries
 
----@class ScriptedTrainDestination
+---@class (exact) ScriptedTrainDestination
 ---@field public train LuaTrain
 ---@field public stop_distance number
 ---@field public brake_force number
----@field public stopping boolean
 ---@field public traveled number
----@field public is_forward boolean?
 ---@field public decouple_at LuaEntity
 ---@field public decouple_dir defines.rail_direction
 ---@field public network string
+---@field public stopping boolean
 ---@field public station RSAD.Station
+---@field public await AsyncAwait
 
 ---@class PendingChange
 ---@field public station RSAD.Station
@@ -341,10 +345,11 @@ local function calculate_brake_force(traveled, brake_force, speed, destination)
     local brake_distance = speed * speed / brake_force * 0.5
     local brake_start = destination - brake_distance
     local dist_to_start = (brake_start - traveled)
-    local brake_comp = (dist_to_start / brake_distance) * brake_force
-    local decel = ((dist_to_start <= 0) and math.max(0, brake_force + brake_comp)) or 0 
+    local brake_comp = math.min(1, (dist_to_start / brake_distance)) * brake_force --Distributes an adjustment factor across the braking distance, capped to brake_force (brake_force x2)
+    local to_brake = dist_to_start <= (brake_force * 0.25)
+    local decel = (to_brake and math.max(0, brake_force + brake_comp)) or 0 
 
-    return (dist_to_start <= 0), decel
+    return to_brake, decel
 end
 
 ---@param self RSAD.Scheduler
@@ -377,24 +382,24 @@ function scheduler.process_script_movement(self)
     local killed = {}
     local updated = false
     for id, data in pairs(self.scripted_trains) do
-        updated = true
         if not data.train or not data.train.valid then killed[id] = id goto continue end
-        local path = data.train.path
+        if data.stopping and not data.train.manual_mode then killed[id] = id goto continue end --Train was manually changed by player and is no longer controlled by script
+
+        updated = true
         local speed = data.train.speed
-        if path then
-            data.is_forward = path.is_front
-        end
         
         local eff_brake = data.brake_force / data.train.weight
         local braking, decel = calculate_brake_force(data.traveled, eff_brake, speed, data.stop_distance)
+        local speed_dir = fmath.sign(speed)
         if braking or data.stopping then
-            decel = decel * (data.is_forward and 1 or -1) 
+            decel = decel * speed_dir
             data.stopping = true
             data.train.manual_mode = true
-            speed = speed - decel
+            speed = (speed_dir > 0 and math.max(0, speed - decel)) or fmath.min(0, speed - decel)
         end
+
         data.traveled = data.traveled + math.abs(speed)
-        if data.stopping and (math.abs(speed) <= 0.0001) then
+        if data.stopping and ((speed * speed_dir) <= 0.0) then --If speed_dir is backward will multiply by -1 such that it checks it as if it were forward
             speed = 0
             stopped_trains[id] = data
         end
@@ -418,6 +423,27 @@ end
 ---@return boolean --false if no more needed
 function scheduler.on_tick(self)
     return self:process_script_movement()
+end
+
+---@return AsyncAwait
+function scheduler.move_train(self, train, distance, direction)
+    local await = {complete = false} --[[@type AsyncAwait]]
+    local brake_force = 0.0
+    local brake_multiplier = nil
+    for _, l in pairs(train.carriages) do
+        brake_multiplier = 1.0 + l.force.train_braking_force_bonus
+        brake_force = brake_force + l.prototype.braking_force
+    end
+    brake_force = brake_force * (brake_multiplier or 1.0)
+
+    ---Create temp move schedule
+    local lua_schedule = train.get_schedule()
+    lua_schedule.add_record({index = {schedule_index = 1}, temporary = true, rail = connected_rail, wait_conditions = {{type = "time", ticks = 2}}})
+    lua_schedule.go_to_station(1)
+    self.scheduler:move_train_by_distance(train, disconnect_from, disconnect_from.is_headed_to_trains_front and defines.rail_direction.front or defines.rail_direction.back, stop_distance, signal_hash(station_data.network) or "", station)
+
+
+    return await
 end
 
 ---comment
@@ -451,7 +477,7 @@ function scheduler.move_train_by_wagon_count(self, train, move_from, count, netw
     next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
     --stop_distance = stop_distance + (next_carriage and ((next_carriage.prototype.joint_distance / 2)) or 0.0)
 
-    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, traveled = 0, decouple_at = carriage, decouple_dir = direction, network = network, station = station} --[[@type ScriptedTrainDestination]]
+    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, traveled = 0, decouple_at = carriage, decouple_dir = direction, network = network, station = station, await = {complete = false}} --[[@type ScriptedTrainDestination]]
 
     self.scripted_trains[train.id] = train_data
 
@@ -475,7 +501,7 @@ function scheduler.move_train_by_distance(self, train, decouple_at, decouple_dir
     end
     brake_force = brake_force * (brake_multiplier or 1.0)
 
-    local train_data = {train = train, brake_force = brake_force, stop_distance = distance, stopping = false, traveled = 0, decouple_at = decouple_at, decouple_dir = decouple_dir, network = network, station = station} --[[@type ScriptedTrainDestination]]
+    local train_data = {train = train, brake_force = brake_force, stop_distance = distance, stopping = false, traveled = 0, decouple_at = decouple_at, decouple_dir = decouple_dir, network = network, station = station, await = {complete = false}} --[[@type ScriptedTrainDestination]]
 
     self.scripted_trains[train.id] = train_data
 

@@ -2,7 +2,7 @@ local rsad_controller = rsad_controller --- Find Global rsad_controller
 assert(rsad_controller ~= nil)
 
 flib_gui = require("__flib__.gui")
-flib_math = require("__flib__.math")
+fmath = require("__flib__.math")
 require("prototypes.names")
 require("scripts.defines")
 require("scripts.rsad.util")
@@ -233,11 +233,11 @@ function handle_train_limit(e)
 	if not entity or not entity.valid then return end
 
     if element.type == "slider" then
-        local value = flib_math.clamp(element.slider_value, 1, max_train_limit)
+        local value = fmath.clamp(element.slider_value, 1, max_train_limit)
         entity.trains_limit = value
         element.parent.number_field.text = tostring(entity.trains_limit)
     else
-        local value = flib_math.clamp(tonumber(element.text), 1, max_train_limit)
+        local value = fmath.clamp(tonumber(element.text), 1, max_train_limit)
         entity.trains_limit =  value
         element.text = tostring(value)
         element.parent.slider.slider_value = entity.trains_limit
@@ -254,11 +254,11 @@ function handle_cargo_limit(e)
 
     local limit = 1
     if element.type == "slider" then
-        local value = flib_math.clamp(element.slider_value, 1, max_cargo_limit)
+        local value = fmath.clamp(element.slider_value, 1, max_cargo_limit)
         limit = value
         element.parent.number_field.text = tostring(limit)
     else
-        local value = flib_math.clamp(tonumber(element.text), 1, max_cargo_limit)
+        local value = fmath.clamp(tonumber(element.text), 1, max_cargo_limit)
         limit =  value
         element.text = tostring(value)
         element.parent.slider.slider_value = limit

@@ -8,9 +8,10 @@ require("scripts.rsad.util")
 ---@return integer new_train_id
 function rsad_controller.couple_direction(self, train, direction)
     local old_id = train.id
+    local old_lua_schedule = train.get_schedule()
     local connecting_stock = direction == (defines.rail_direction.front and train.carriages[0]) or train.carriages[#train.carriages]
     local connect_dir = connecting_stock.get_connected_rolling_stock(defines.rail_direction.front) and defines.rail_direction.back or defines.rail_direction.front
-    if not connecting_stock.connect_rolling_stock(direction) then log("Failed to couple train [" .. train.id .. "]") return -1 end
+    if not connecting_stock.connect_rolling_stock(connect_dir) then log("Failed to couple train [" .. train.id .. "]") return -1 end
     train = connecting_stock.train
     if not train then log("Train is nil after coupling train") return -1 end
     local new_id = train.id
@@ -27,6 +28,14 @@ function rsad_controller.couple_direction(self, train, direction)
         end
     end
 
+    ---Copy old schedule
+    local new_schedule = train.get_schedule()
+    new_schedule.group = old_lua_schedule.group
+    new_schedule.set_interrupts(old_lua_schedule.get_interrupts())
+    local records = old_lua_schedule.get_records()
+    if records then new_schedule.set_records(records) end
+    new_schedule.current = old_lua_schedule.current
+
     return new_id
 end
 
@@ -39,17 +48,17 @@ end
 ---@return integer new_train_id
 function rsad_controller.decouple_at(self, train, at, direction, park_self)
     local old_id = train.id
-    local schedule = train.schedule
+    local old_lua_schedule = train.get_schedule()
     local other = at.get_connected_rolling_stock(direction)
     if at.disconnect_rolling_stock(direction) then  log("Failed to decouple train [" .. train.id .. "]") return -1 end
     local new_id = at.train.id
     if not train then log("Train is nil after decoupling train") return -1 end
-    at.train.schedule = schedule
-    at.train.manual_mode = false
 
     local parked_at = self.station_assignments[old_id]
     if parked_at then
-        if other and other.train then
+        if other and other.train and not park_self then
+            ---Clear schedule to prevent overrides when coupling afterwards
+            other.train.schedule = {current = 0, records = {}}
             self:park_train_at_station(other.train.id, parked_at)
         else 
             self:park_train_at_station(new_id, parked_at)
@@ -63,6 +72,14 @@ function rsad_controller.decouple_at(self, train, at, direction, park_self)
             yard:redefine_shunter(old_id, new_id)
         end
     end
+
+    ---Copy old schedule
+    local new_schedule = train.get_schedule()
+    new_schedule.group = old_lua_schedule.group
+    new_schedule.set_interrupts(old_lua_schedule.get_interrupts())
+    local records = old_lua_schedule.get_records()
+    if records then new_schedule.set_records(records) end
+    new_schedule.current = old_lua_schedule.current
 
     return new_id
 end

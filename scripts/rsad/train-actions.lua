@@ -93,10 +93,10 @@ end
 ---@param controller RSAD.Controller
 ---@param scope RSAD.Actions.Scope
 ---@param alignment TrainAlignment
----@return AsyncAwait<RSAD.Actions.Scope>
+---@return AsyncAwait
 function RSAD_Actions.exec_align(train, controller, scope, alignment)
-    
-    local await = { scope = scope, complete = false } --[[@type AsyncAwait<RSAD.Actions.Scope>]]
+    local await = controller:move_train(train, 0)
+    await.scope = scope
     return await
 end
 ---Align train to station
@@ -145,7 +145,7 @@ function RSAD_Actions.start_actionset_execution(set, controller)
 end
 
 ---@async
----@param context AsyncAwait<RSAD.Actions.Scope>
+---@param context AsyncAwait
 ---@param train LuaTrain
 ---@param controller RSAD.Controller
 ---@return boolean, AsyncAwait?
