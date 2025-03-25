@@ -20,6 +20,7 @@ rsad_station_name[rsad_station_type.empty_pickup] = "Empty Wagon Pickup"
 
 ---@enum rsad_shunting_stage
 rsad_shunting_stage = {
+    unspecified = -1, --[[@as rsad_shunting_stage.unspecified]] -- Placeholder for trains with no shunting stage or that are not shunters
     available = 0, --[[@as rsad_shunting_stage.available ]]
     sort_imports = 1 --[[@as rsad_shunting_stage.sort_imports ]], -- taking wagons from import_staging_stations into their respective import_stations
     delivery = 2 --[[@as rsad_shunting_stage.delivery ]], -- delivering from import_stations to request_stations
@@ -33,6 +34,15 @@ rsad_stage_name[rsad_shunting_stage.sort_imports] = "Import Sorting"
 rsad_stage_name[rsad_shunting_stage.delivery] = "Item Delivery"
 rsad_stage_name[rsad_shunting_stage.clear_empty] = "Empty Wagon Clear"
 rsad_stage_name[rsad_shunting_stage.return_to_depot] = "Depot Return"
+
+---@enum RSAD.Station.Status
+rsad_station_status = {
+    active = "rsad-station.status.default", --[[@as RSAD.Station.Status.active]]
+    idle = "rsad-station.status.idle",--[[@as RSAD.Station.Status.idle]]
+    inactive = "rsad-station.status.inactive",--[[@as RSAD.Station.Status.inactive]]
+    needs_request = "rsad-station.status.needs_request",--[[@as RSAD.Station.Status.needs_request]]
+    has_empty = "rsad-station.status.has_empty",--[[@as RSAD.Station.Status.has_empty]]
+}
 
 STATION_TYPE_ID = 0
 STATION_TYPE_ID_WIDTH = 4

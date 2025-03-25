@@ -1,20 +1,22 @@
+local RSAD_Actions = require("scripts.rsad.station-actions")
+require("scripts.rsad.default-action-sets")
 require("scripts.defines")
 require("scripts.rsad.util")
 
 ---@class RSAD.Station.Data
 ---@field public type rsad_station_type?
 ---@field public network SignalID?
----@field public item SignalID?
+---@field public request SignalID?
 ---@field public subinfo uint?
 ---@field public train_limit uint?
 ---@field public reversed_shunting boolean?
 
 ---@see create_rsad_station
----
 ---@class RSAD.Station
 ---@field public unit_number uint
----@field public assignments uint -- Number of assigned trains to this station
+---@field public incoming uint -- Number of assigned trains to this station
 ---@field public parked_train uint? -- train ID that is currently parked at this station. Wagons without a locomotive also have a train ID. nil if none
+---@field public arrival_actions table<rsad_shunting_stage, RSAD.Actions.Set> -- Action Set that the train with this shunting stage will perfom on arrival
 
 ---@param constant int
 ---@return uint type, uint subinfo, boolean reversed
@@ -50,7 +52,7 @@ function get_station_data(station)
     local data = {
         type = type --[[@as rsad_station_type]],
         network = control.stopped_train_signal,
-        item = control.priority_signal,
+        request = control.priority_signal,
         subinfo = subinfo,
         train_limit = station_entity.trains_limit,
         reversed_shunting = reversed
@@ -61,20 +63,21 @@ end
 
 ---@param station RSAD.Station
 ---@param new_data RSAD.Station.Data
+---@param reload boolean?
 ---@return boolean success
-function update_station_data(station, new_data)
+function update_station_data(station, new_data, reload)
     local station_entity = game.get_entity_by_unit_number(station.unit_number)
     if not station_entity or not station_entity.valid then return false end
 
     local control = station_entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
     ------@diagnostic disable-next-line: undefined-field --- CircuitCondition Changed v2.0.35
     local old_type, old_subinfo, old_reversed = unpack_station_constant(control.circuit_condition.constant or 1)
-    local type, network, item, subinfo, train_limit, reversed =
+    local station_type, network, item, subinfo, train_limit, reversed =
         new_data.type or old_type, new_data.network or control.stopped_train_signal,
-        new_data.item or control.priority_signal, new_data.subinfo or old_subinfo,
+        new_data.request or control.priority_signal, new_data.subinfo or old_subinfo,
         new_data.train_limit or station_entity.trains_limit, new_data.reversed_shunting or old_reversed
 
-    local needs_update = type ~= old_type or network ~= control.stopped_train_signal or
+    local needs_update = reload or station_type ~= old_type or network ~= control.stopped_train_signal or
                          item ~= control.priority_signal or subinfo ~= old_subinfo or
                          train_limit ~= station_entity.trains_limit or reversed ~= old_reversed
 
@@ -86,10 +89,18 @@ function update_station_data(station, new_data)
 
     local circuit = control.circuit_condition
     ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
-    circuit.constant = pack_station_constant(type, subinfo, reversed)
+    circuit.constant = pack_station_constant(station_type, subinfo, reversed)
     control.circuit_condition = circuit
 
-    update_rsad_station_name(station_entity, control, type)
+    new_data.network = network
+    new_data.request = item
+    new_data.reversed_shunting = reversed
+    new_data.subinfo = subinfo
+    new_data.train_limit = train_limit
+    new_data.type = station_type
+    station.arrival_actions = RSAD_Actions.create_action_set(new_data)
+
+    update_rsad_station_name(station_entity, control, station_type)
 
     return true
 end
@@ -107,11 +118,12 @@ end
 ---@return RSAD.Station station
 function create_rsad_station(entity)
     entity.trains_limit = 1
+    --[[@type RSAD.Station]]
     local station = {
         unit_number = entity.unit_number,
-        assignments = 0,
-        parked_train = nil
-    } --[[@type RSAD.Station]]
+        incoming = 0,
+        arrival_actions = {}
+    } 
     
     return station
 end

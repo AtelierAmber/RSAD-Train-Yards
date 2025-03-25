@@ -33,6 +33,11 @@ function handle_close(e)
 	local entity = game.get_entity_by_unit_number(element.tags.id --[[@as uint]])
 	if not entity or not entity.valid then return end
 
+    local station = rsad_controller.stations[entity.unit_number]
+    if station then
+        update_station_data(station, {}, true)
+    end
+
 	local player = game.get_player(e.player_index)
 	if not player then return end
 	local rootgui = player.gui.screen

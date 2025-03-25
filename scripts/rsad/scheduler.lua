@@ -1,6 +1,6 @@
 require("scripts.rsad.station")
 require("scripts.rsad.util")
-require("scripts.rsad.train-actions")
+require("scripts.rsad.station-actions")
 require("scripts.defines")
 
 ---@type flib_queue
@@ -15,16 +15,12 @@ fmath = require("__flib__.math")
 ---@field public stop_distance number
 ---@field public brake_force number
 ---@field public traveled number
----@field public decouple_at LuaEntity
----@field public decouple_dir defines.rail_direction
----@field public network string
----@field public stopping boolean
----@field public station RSAD.Station
+---@field public stopping boolean?
 ---@field public await AsyncAwait
 
 ---@class PendingChange
 ---@field public station RSAD.Station
----@field public create_schedule fun(yard:RSAD.TrainYard, ...:any): ScheduleRecord[], RSAD.TrainYard.ShuntingData, RSAD.Station[]
+---@field public create_schedule fun(yard:RSAD.TrainYard, ...:any): ScheduleRecord[], RSAD.TrainYard.ShuntingData
 
 ---@class RSAD.Scheduler
 scheduler = {
@@ -38,17 +34,14 @@ local next = next -- Assign local table next for indexing speed
 ---@param target_station RSAD.Station
 ---@param reversed boolean
 ---@return ScheduleRecord
-local function default_target_record(target_station, reversed)
+local function generate_target_record(target_station, reversed)
     local target_entity = game.get_entity_by_unit_number(target_station.unit_number)
     if not target_entity then return {} end
     local target_rail = target_entity.connected_rail
     local reversed_rail_direction = target_entity.connected_rail_direction == defines.rail_direction.back and defines.rail_direction.front or defines.rail_direction.back
-    local station_name = nil
-    if not reversed then station_name = target_entity.backer_name end
 
     ---@type ScheduleRecord
     return {
-        station = station_name,
         rail = target_rail,
         rail_direction = reversed and reversed_rail_direction or target_entity.connected_rail_direction,
         wait_conditions = {
@@ -88,15 +81,16 @@ local function station_is_pending(self, station)
 end
 
 ---@param yard RSAD.TrainYard
----@param item string?
+---@param item SignalID?
 ---@param train_limit integer
 ---@return RSAD.Station?
 local function get_next_providing_station(yard, item, train_limit)
-    local import = yard[rsad_station_type.import][item] --[[@type table<uint, RSAD.Station>]]
+    local request_hash = signal_hash(item)
+    local import = yard[rsad_station_type.import][request_hash] --[[@type table<uint, RSAD.Station>]]
     if not import then return nil end
 
     for unit, station in pairs(import) do
-        if station.assignments < train_limit and station.parked_train then
+        if station.incoming < train_limit and station.parked_train then
             return station
         end
     end
@@ -106,39 +100,38 @@ end
 
 ---@param yard RSAD.TrainYard
 ---@param requester_station RSAD.Station
----@return ScheduleRecord[]?, RSAD.TrainYard.ShuntingData?, RSAD.Station[]?
+---@return ScheduleRecord[]?, RSAD.TrainYard.ShuntingData?
 local function item_request_schedule(yard, requester_station)
     ---Create request station record
     local data_success, station_entity, station_data = get_station_data(requester_station)
     if not data_success then return nil end
     ---@type ScheduleRecord[]
-    local request_record = default_target_record(requester_station, station_data.reversed_shunting)
+    local request_record = generate_target_record(requester_station, station_data.reversed_shunting)
     local records = {
         [1] = request_record
     }
-    local visited_stations = {}
-    table.insert(visited_stations, requester_station)
     ---@type RSAD.TrainYard.ShuntingData
-    local new_data = { current_stage = rsad_shunting_stage.delivery, pickup_info = station_data.subinfo } 
+    local new_data = { current_stage = rsad_shunting_stage.delivery, pickup_info = station_data.subinfo, scheduled_stations = {} } 
+    table.insert(new_data.scheduled_stations, 1, requester_station)
     ---Check for turnabout
     local turnabout_station = yard[rsad_station_type.turnabout][rsad_shunting_stage.delivery]
     local turnabout_record = nil
     if turnabout_station then
-        turnabout_record = default_target_record(turnabout_station, false)
+        turnabout_record = generate_target_record(turnabout_station, false)
         turnabout_record.wait_conditions = nil
         table.insert(records, 1, turnabout_record)
-        table.insert(visited_stations, turnabout_station)
+        table.insert(new_data.scheduled_stations, 1, turnabout_station)
     end
     ---Create pickup record
-    local input_station = get_next_providing_station(yard, station_data.item and station_data.item.name, station_data.train_limit)
+    local input_station = get_next_providing_station(yard, station_data.request, station_data.train_limit)
     if not input_station then return nil end
     data_success, station_entity, station_data = get_station_data(input_station)
     if data_success then
-        table.insert(records, 1, default_target_record(input_station, station_data.reversed_shunting))
-        table.insert(visited_stations, input_station)
+        table.insert(records, 1, generate_target_record(input_station, station_data.reversed_shunting))
+        table.insert(new_data.scheduled_stations, 1, input_station)
     else return nil end
     
-    return records, new_data, visited_stations
+    return records, new_data
 end
 
 ---@param self RSAD.Scheduler
@@ -153,9 +146,10 @@ function scheduler.queue_station_request(self, station)
     if not yard then return false, 2 end
 
     ---Preliminary assertions
-    if (not data.item or not yard[rsad_station_type.import] or 
-        yard[rsad_station_type.import][data.item.name] == nil or 
-        next(yard[rsad_station_type.import][data.item.name]) == nil) or
+    local request_hash = signal_hash(data.request)
+    if (not data.request or not yard[rsad_station_type.import] or 
+        yard[rsad_station_type.import][request_hash] == nil or 
+        next(yard[rsad_station_type.import][request_hash]) == nil) or
        (next(yard.shunter_trains) == nil) or station_is_pending(self, station) then
        return false --Failed to queue request, no Error 
     end
@@ -175,7 +169,7 @@ end
 
 ---@param yard RSAD.TrainYard
 ---@param removal_station RSAD.Station
----@return ScheduleRecord[]?, RSAD.TrainYard.ShuntingData?, RSAD.Station[]?
+---@return ScheduleRecord[]?, RSAD.TrainYard.ShuntingData?
 local function remove_wagon_schedule(yard, removal_station)
     local data_success, station_entity, station_data = get_station_data(removal_station)
     if not data_success then return nil end
@@ -192,24 +186,23 @@ local function remove_wagon_schedule(yard, removal_station)
     local records = {
         [1] = pickup_record
     }
-    local visited_stations = {}
-    table.insert(visited_stations, removal_station)
     ---@type RSAD.TrainYard.ShuntingData
-    local new_data = { current_stage = rsad_shunting_stage.clear_empty, pickup_info = #parked_train.carriages } 
+    local new_data = { current_stage = rsad_shunting_stage.clear_empty, pickup_info = #parked_train.carriages, scheduled_stations = {} } 
+    table.insert(new_data.scheduled_stations, 1, removal_station)
     ---Check for turnabout
     local turnabout_station = yard[rsad_station_type.turnabout][rsad_shunting_stage.clear_empty]
     local turnabout_record = nil
     if turnabout_station then
-        turnabout_record = default_target_record(turnabout_station, false)
+        turnabout_record = generate_target_record(turnabout_station, false)
         turnabout_record.wait_conditions = nil
         table.insert(records, turnabout_record)
-        table.insert(visited_stations, turnabout_station)
+        table.insert(new_data.scheduled_stations, turnabout_station)
     end
     ---Dropoff record
     local empty_stagings = yard[rsad_station_type.empty_staging] --[[@type table<integer, RSAD.Station>]]
     local dropoff = nil --[[@type RSAD.Station?]]
     for unit, empty_station in pairs(empty_stagings) do
-        if empty_station.assignments > 0 then goto continue end
+        if empty_station.incoming > 0 then goto continue end
         if not empty_station.parked_train then  
             dropoff = empty_station
             break
@@ -224,12 +217,12 @@ local function remove_wagon_schedule(yard, removal_station)
         ::continue::
     end
     if dropoff then
-        local dropoff_record = default_target_record(dropoff, false)
+        local dropoff_record = generate_target_record(dropoff, false)
         table.insert(records, dropoff_record)
-        table.insert(visited_stations, dropoff)
+        table.insert(new_data.scheduled_stations, dropoff)
     else return nil end
 
-    return records, new_data, visited_stations
+    return records, new_data
 end
 
 ---@param self RSAD.Scheduler
@@ -265,25 +258,42 @@ end
 ---@param train LuaTrain
 ---@param yard RSAD.TrainYard
 function scheduler.return_shunter(self, train, yard)
-    local return_depot = select(2, next(yard[rsad_station_type.shunting_depot]))
-      if return_depot then
+    local return_depot_start --[[@type RailEndGoal]]
+    local free_depot_starts = {} --[[@type table<number, RailEndStart>]]
+    local free_depot_stations = {} --[[@type table<number, RSAD.Station>]]
+    for _, depot in pairs(yard[rsad_station_type.shunting_depot]) do
+        ---@cast depot RSAD.Station
+        if not depot.parked_train and depot.incoming == 0 then
+            local target_entity = game.get_entity_by_unit_number(depot.unit_number)
+            local target_rail = target_entity and target_entity.connected_rail
+            if not target_rail then goto continue end
+            free_depot_starts[#free_depot_starts+1] = {rail = target_rail, direction = target_entity.connected_rail_direction}
+            free_depot_stations[#free_depot_stations+1] = depot
+        end
+        ::continue::
+    end
+    local path = game.train_manager.request_train_path({type = "any-goal-accessible", starts = free_depot_starts, goals = {train.front_end, train.back_end}, train = train, in_chain_signal_section = false})
+
+    if path.found_path then
+        return_depot_start = free_depot_starts[path.start_index]
         local records = {
-            [1] = default_target_record(return_depot, false)
+            [1] = {
+                rail = return_depot_start.rail,
+                rail_direction = return_depot_start.direction,
+                wait_conditions = {
+                    {
+                        type = "time",
+                        ticks = 2
+                    }
+                }
+            }
         }
         train.schedule = {current = 1, records = records}
         train.manual_mode = false
-        yard.shunter_trains[train.id].current_stage = rsad_shunting_stage.return_to_depot
-        yard.shunter_trains[train.id].pickup_info = 0
-    end
-end
-
----@param self RSAD.Scheduler
----@param train LuaTrain
----@param yard RSAD.TrainYard
-function scheduler.check_and_return_shunter(self, train, yard)
-    local schedule = train.schedule
-    if schedule and schedule.current == #schedule.records then
-        self:return_shunter(train, yard)
+        local shunting_data = yard.shunter_trains[train.id]
+        shunting_data.current_stage = rsad_shunting_stage.return_to_depot
+        shunting_data.pickup_info = 0
+        shunting_data.scheduled_stations = {[1] = free_depot_stations[path.start_index]}
     end
 end
 
@@ -298,12 +308,6 @@ function scheduler.update(self)
     if not data_success then goto tick_loop end
     local yard = self.controller:get_train_yard_or_nil(station_data.network)
     if not yard then goto tick_loop end
-
-    ---Try to create schedule
-    local records, new_data, visiting_stations = change.create_schedule(yard, change.station)
-    if not records then goto tick_loop end
-    ---@type TrainSchedule
-    local schedule = { current = 1, records = records}
 
     ---Find an available and most convenient shunter
     local shunters =  yard.shunter_trains
@@ -323,17 +327,43 @@ function scheduler.update(self)
 
     local train = game.train_manager.get_train_by_id(first_finishing or first_idle or 0)
     if train then
+        ---Try to create schedule
+        local records, new_data = change.create_schedule(yard, change.station)
+        if not records then goto tick_loop end
+        ---@type TrainSchedule
+        local schedule = { current = 1, records = records}
+
         train.schedule = schedule
         train.manual_mode = false
 
-        shunters[train.id] = new_data
-        for _, visit in pairs(visiting_stations) do
-            visit.assignments = visit.assignments + 1
+TODO: MIGRATION FIX INCOMING
+FIX SHUNTER PATHING 
+RESTRICT INCOMING SUBTRACTION TO SHUNTERS
+FIX SHUNTER ASSIGNMENT (?) 
+
+        for _, visit in pairs(new_data.scheduled_stations) do
+            visit.incoming = visit.incoming + 1
         end
+        shunters[train.id] = new_data
         return true
     end
 
     return false
+end
+
+--#region SCRIPTED TRAIN MOVEMENT
+
+---@param self RSAD.Scheduler
+---@param train LuaTrain
+---@param await AsyncAwait
+function scheduler.on_scripted_stop(self, train, await)
+    local schedule = train.get_schedule()
+    schedule.remove_record({schedule_index = 1})
+    if await.scope then
+        RSAD_Actions.continue_actionset_execution(await, train, self.controller)
+    else
+        train.manual_mode = false
+    end
 end
 
 ---@param traveled number --Distance traveled so far
@@ -353,33 +383,10 @@ local function calculate_brake_force(traveled, brake_force, speed, destination)
 end
 
 ---@param self RSAD.Scheduler
----@param data ScriptedTrainDestination
-function scheduler.on_scripted_stop(self, data)
-    local yard = self.controller.train_yards[data.network or ""]
-    if yard then
-        local train_info = yard.shunter_trains[data.train.id]
-        if train_info then
-            if train_info.current_stage == rsad_shunting_stage.delivery then
-                self.controller:decouple_and_assign(data.train, data.decouple_at, data.decouple_dir, data.network, data.station)
-            elseif train_info.current_stage == rsad_shunting_stage.clear_empty then
-                local decoupled, new_train = self.controller:decouple_all_cargo(data.train, data.station, true)
-                if decoupled then 
-                    self:return_shunter(new_train, yard)
-                else
-                    game.print("Failed to decouple at " .. (data.train and data.train.valid and data.train.front_stock and data.train.front_stock.gps_tag or "nil"))
-                end
-            end
-        end
-    else
-        self.controller:decouple_and_assign(data.train, data.decouple_at, data.decouple_dir, data.network, data.station)
-    end
-end
-
----@param self RSAD.Scheduler
 ---@return boolean --false if no update is needed
 function scheduler.process_script_movement(self)
-    local stopped_trains = {}
-    local killed = {}
+    local stopped_trains = {} --[[@type table<number, ScriptedTrainDestination>]]
+    local killed = {} --[[@type table<number, number>]]
     local updated = false
     for id, data in pairs(self.scripted_trains) do
         if not data.train or not data.train.valid then killed[id] = id goto continue end
@@ -413,21 +420,18 @@ function scheduler.process_script_movement(self)
 
     for id, data in pairs(stopped_trains) do
         self.scripted_trains[id] = nil
-        self:on_scripted_stop(data)
+        self:on_scripted_stop(data.train, data.await)
     end
 
     return updated
 end
 
+---Moves a train distance along its current path
 ---@param self RSAD.Scheduler
----@return boolean --false if no more needed
-function scheduler.on_tick(self)
-    return self:process_script_movement()
-end
-
+---@param train LuaTrain
+---@param distance uint --Number of carriages to move. If negative will count in reverse
 ---@return AsyncAwait
-function scheduler.move_train(self, train, distance, direction)
-    local await = {complete = false} --[[@type AsyncAwait]]
+function scheduler.move_train_by_distance(self, train, distance)
     local brake_force = 0.0
     local brake_multiplier = nil
     for _, l in pairs(train.carriages) do
@@ -436,78 +440,17 @@ function scheduler.move_train(self, train, distance, direction)
     end
     brake_force = brake_force * (brake_multiplier or 1.0)
 
-    ---Create temp move schedule
-    local lua_schedule = train.get_schedule()
-    lua_schedule.add_record({index = {schedule_index = 1}, temporary = true, rail = connected_rail, wait_conditions = {{type = "time", ticks = 2}}})
-    lua_schedule.go_to_station(1)
-    self.scheduler:move_train_by_distance(train, disconnect_from, disconnect_from.is_headed_to_trains_front and defines.rail_direction.front or defines.rail_direction.back, stop_distance, signal_hash(station_data.network) or "", station)
+    local await = {complete = false} --[[@type AsyncAwait]]
+    local train_data = {train = train, brake_force = brake_force, stop_distance = distance, traveled = 0, await = await} --[[@type ScriptedTrainDestination]]
 
+    self.scripted_trains[train.id] = train_data
+
+    self.controller:trigger_tick()
 
     return await
 end
 
----comment
----@param self RSAD.Scheduler
----@param train LuaTrain
----@param move_from LuaEntity --Carriage that marks the destination for [count away] trains
----@param count uint --Number of carriages to move. If negative will count in reverse
----@param network string --Network this train is assigned in
----@param station RSAD.Station --Station to assign the decoupled train to
-function scheduler.move_train_by_wagon_count(self, train, move_from, count, network, station)
-    local brake_force = 0.0
-    local brake_multiplier = nil
-    for _, l in pairs(train.carriages) do
-        brake_multiplier = 1.0 + l.force.train_braking_force_bonus
-        brake_force = brake_force + l.prototype.braking_force
-    end
-    brake_force = brake_force * (brake_multiplier or 1.0)
-    local stop_distance = 0.0
-    
-    local direction = ((count < 0 and defines.rail_direction.back) or defines.rail_direction.front)
-    local carriage = move_from --[[@type LuaEntity?]]
-    local next_carriage = carriage --[[@type LuaEntity?]]
-    count = math.abs(count)
-    for i = 1, count, 1 do
-        carriage = next_carriage
-        next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
-        if not next_carriage then return end
-        local distance = (carriage and carriage.prototype.joint_distance + carriage.prototype.connection_distance) or 0
-        stop_distance = stop_distance + distance
-    end
-    next_carriage = carriage and carriage.get_connected_rolling_stock(direction)
-    --stop_distance = stop_distance + (next_carriage and ((next_carriage.prototype.joint_distance / 2)) or 0.0)
-
-    local train_data = {train = train, brake_force = brake_force, stop_distance = stop_distance, stopping = false, traveled = 0, decouple_at = carriage, decouple_dir = direction, network = network, station = station, await = {complete = false}} --[[@type ScriptedTrainDestination]]
-
-    self.scripted_trains[train.id] = train_data
-
-    self.controller:trigger_tick()
-end
-
----comment
----@param self RSAD.Scheduler
----@param train LuaTrain
----@param decouple_at LuaEntity -- Which carriage to decouple from
----@param decouple_dir defines.rail_direction
----@param distance uint --Number of carriages to move. If negative will count in reverse
----@param network string --Network this train is assigned in
----@param station RSAD.Station --Station to assign the decoupled train to
-function scheduler.move_train_by_distance(self, train, decouple_at, decouple_dir, distance, network, station)
-    local brake_force = 0.0
-    local brake_multiplier = nil
-    for _, l in pairs(train.carriages) do
-        brake_multiplier = 1.0 + l.force.train_braking_force_bonus
-        brake_force = brake_force + l.prototype.braking_force
-    end
-    brake_force = brake_force * (brake_multiplier or 1.0)
-
-    local train_data = {train = train, brake_force = brake_force, stop_distance = distance, stopping = false, traveled = 0, decouple_at = decouple_at, decouple_dir = decouple_dir, network = network, station = station, await = {complete = false}} --[[@type ScriptedTrainDestination]]
-
-    self.scripted_trains[train.id] = train_data
-
-    self.controller:trigger_tick()
-end
-
+--#endregion
 
 --- #region SORTING IMPORT MULTI-INGREDIENT ---
 
@@ -516,6 +459,12 @@ end
 ---@param station RSAD.Station
 function scheduler.on_receive_multi_import(self, incoming, station)
     local wagons = incoming.cargo_wagons
+end
+
+---@param self RSAD.Scheduler
+---@return boolean --false if no more needed
+function scheduler.on_tick(self)
+    return self:process_script_movement()
 end
 
 --- #endregion ---

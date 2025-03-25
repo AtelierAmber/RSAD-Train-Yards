@@ -96,30 +96,13 @@ end
 ---@param old_state defines.train_state
 function rsad_controller.__on_train_state_change(self, train, old_state)
     if train.state == defines.train_state.wait_station then
-        local station = train.station and self.stations[train.station.unit_number]
-        if not station then 
-            ---Check for rail stop
-            local schedule = train.schedule
-            local record = schedule and schedule.records[schedule.current]
-            local rail = record and record.rail
-            if not record or not rail then return end
-            local seek_direction = (record.rail_direction == defines.rail_direction.front and defines.rail_direction.back) or defines.rail_direction.front
-            local stop = rail.get_rail_segment_stop(seek_direction)
-            if stop then 
-                station = self.stations[stop.unit_number]
-            else
-                local rail_end = rail.get_rail_end(seek_direction)
-                rail_end.flip_direction()
-                for i = 1, max_cargo_limit, 1 do
-                    rail_end.move_to_segment_end()
-                    stop = rail_end.rail.get_rail_segment_stop(rail_end.direction)
-                    if stop then break end
-                    rail_end.move_natural()
-                end
-                if stop then 
-                    station = self.stations[stop.unit_number]
-                else return end
-            end
+        local station = (train.station and self.stations[train.station.unit_number]) or self.station_assignments[train.id]
+        if not station then
+            local network = self.shunter_networks[train.id] 
+            local yard = network and self.train_yards[network]
+            local shunter = yard and yard.shunter_trains[train.id]
+            station = shunter and shunter.scheduled_stations[train.schedule.current]
+            if not station then return end
         end
         self:__on_arrive_at_station(station, train, old_state)
     end
@@ -171,7 +154,7 @@ function rsad_controller.__on_train_removed(self, train)
     if not train then return true end
 
     for _, station in pairs(self.stations) do
-        if station.parked_train == train.id then station.parked_train = nil end
+        if station.parked_train == train.id then self:free_parked_station(station) end
     end
 
     self:remove_shunter(train.id)
@@ -194,9 +177,14 @@ function rsad_controller.__on_paste_settings(self, entity)
     end
 end
 
-function rsad_controller.__main_tick(self)
+function rsad_controller.__main_tick(self, tick_data)
     storage.needs_tick = self.scheduler:on_tick()
     if not storage.needs_tick then script.on_event(defines.events.on_tick, nil) end --Unregister to save UPS
+end
+
+function rsad_controller.trigger_tick(self)
+    storage.needs_tick = true
+    script.on_event(defines.events.on_tick, function(tick_data) self:__main_tick(tick_data) end)
 end
 
 ---@param self RSAD.Controller
@@ -286,7 +274,7 @@ function rsad_controller.decommision_station_from_yard(self, station, keep_netwo
     if hash then
         local yard = data.network and self.train_yards[hash] --[[@as RSAD.TrainYard?]]
         if yard then
-            yard:remove_station(station)
+            yard:remove_station(station.unit_number)
             if yard:is_empty() then
                 self.train_yards[hash] = nil
             end
@@ -352,72 +340,43 @@ function rsad_controller.park_train_at_station(self, train_id, station)
     station.parked_train = train_id
 end
 
+function rsad_controller.redefine_shunter(self, old_id, new_id)
+    local shunter_network = self.shunter_networks[old_id]
+    if shunter_network then
+        self.shunter_networks[old_id] = nil
+        local yard = self.train_yards[shunter_network]
+        if yard then
+            yard:redefine_shunter(old_id, new_id)
+            self.shunter_networks[new_id] = shunter_network
+        end
+    end
+end
+
 ---@package
 ---@param self RSAD.Controller
 ---@param station RSAD.Station
 ---@param train LuaTrain
 ---@param old_state defines.train_state
 function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
-    local success, station_entity,  = get_station_data(station)
-    if not success then return end
-    local yard = self:get_train_yard_or_nil(data.network)
-    if yard then
-        if data.type == rsad_station_type.shunting_depot then
-            self:assign_shunter(train.id, yard)
-        else
-            local train_data = yard.shunter_trains[train.id]
-            local is_shunter = train_data ~= nil
-            if is_shunter then
-                if data.type == rsad_station_type.import then
-                    if train_data.current_stage == rsad_shunting_stage.delivery then
-                        self:attempt_couple_at_station(train, station, train_data.pickup_info)
-                        station.assignments = station.assignments - 1
-                    elseif train_data.current_stage == rsad_shunting_stage.sort_imports then
-                        local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
-                        if not decoupled or not new_train then
-                            game.print("Failed to decouple at " .. (train.front_stock and train.front_stock.gps_tag or "nil"))
-                            return
-                        end
-                        train = new_train
-                        ---TODO CONTINUE SORT
-                    end
-                elseif data.type == rsad_station_type.request then 
-                    if train_data.current_stage == rsad_shunting_stage.delivery then
-                        local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
-                        if not decoupled or not new_train then
-                            game.print("Failed to decouple at " .. (train.front_stock and train.front_stock.gps_tag or "nil"))
-                            return
-                        end
-                        train = new_train
-                        self.scheduler:check_and_return_shunter(train, yard)
-                        station.assignments = station.assignments - 1
-                    elseif train_data.current_stage == rsad_shunting_stage.clear_empty then
-                        self:attempt_couple_at_station(train, station)
-                        station.assignments = station.assignments - 1
-                    end
-                elseif data.type == rsad_station_type.empty_staging then
-                    self:attempt_merge_at_station(train, station)
-                    station.assignments = station.assignments - 1
-                end
-            else
-                if data.type == rsad_station_type.import then
-                    local decoupled, new_train = self:decouple_all_cargo(train, station, is_shunter)
-                    if not decoupled or not new_train then
-                        game.print("Failed to decouple at " .. (train.front_stock and train.front_stock.gps_tag or "nil"))
-                        return
-                    end
-                    train = new_train
-                end
+    station.incoming = station.incoming - 1
+    if station.parked_train == nil then
+        self:park_train_at_station(train.id, station)
+    end
+    local shunter_network = self.shunter_networks[train.id]
+    local yard = (shunter_network and self.train_yards[shunter_network])
+    local shunting_info = (yard and yard.shunter_trains[train.id])
+    local action_set = station.arrival_actions[(shunting_info and shunting_info.current_stage)] or station.arrival_actions[rsad_shunting_stage.unspecified]
+    if action_set then
+        local success, new_train, await = RSAD_Actions.start_actionset_execution(train, action_set, self, station)
+        if not success then 
+            if new_train and new_train.valid then
+                new_train.manual_mode = false
+            elseif train and train.valid then
+                train.manual_mode = false
             end
         end
-
     end
 end
 
-function rsad_controller.trigger_tick(self)
-    storage.needs_tick = true
-    script.on_event(defines.events.on_tick, function(tick_data) self:__main_tick() end)
-end
-
-require("scripts.rsad.coupling") --Coupling Module added to rsad_controller
+require("scripts.rsad.train-commands") --Commands Module added to rsad_controller
 return rsad_controller

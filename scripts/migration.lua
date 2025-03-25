@@ -1,3 +1,4 @@
+---@diagnostic disable: invisible
 local flib_migration = require("__flib__.migration")
 
 ---@type MigrationsTable
@@ -12,7 +13,16 @@ local version_migrations = {
   ["0.0.4"] = function()
     for _, station in pairs(storage.stations) do
       update_station_data(station, {train_limit = 1})
-      station.assignments = 0
+      station.incoming = 0
+      ::continue::
+    end
+    rsad_controller:__load()
+  end,
+  ["0.0.5"] = function()
+    for _, station in pairs(storage.stations) do
+      station.incoming = station.assignments
+---@diagnostic disable-next-line: inject-field
+      station.assignments = nil
       ::continue::
     end
     rsad_controller:__load()
