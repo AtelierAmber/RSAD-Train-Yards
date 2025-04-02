@@ -49,11 +49,12 @@ function RSAD_Actions.create_action_set(station_data)
             move_direction = {runtime = true, variable = RuntimeParamType.starting.train.arrival_direction},
             align_side = {runtime = true, variable = RuntimeParamType.starting.train.arrival_direction},
             ignore_locomotives = true,
-            offset_num = {runtime = true, variable = RuntimeParamType.starting.train.wagon_count}
+            offset_num = {runtime = true, variable = RuntimeParamType.starting.train.wagon_count},
+            continue_no_alignment = true
         })
         RSAD_Actions.decouple(1, false, {runtime = true, variable = RuntimeParamType.starting.train.arrival_direction})
         RSAD_Actions.leave_station()
-        sets[rsad_station_type.empty_staging] = RSAD_Actions.close_set()
+        sets[rsad_shunting_stage.clear_empty] = RSAD_Actions.close_set()
     elseif station_data.type == rsad_station_type.empty_pickup then
     end
     return sets

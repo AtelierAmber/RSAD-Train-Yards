@@ -136,13 +136,14 @@ local function decommision_yard()
 end
 
 ---@param self RSAD.TrainYard
----@param station RSAD.Station
 ---@param controller RSAD.Controller
+---@param station RSAD.Station
+---@param station_entity LuaEntity
 ---@param request string
 ---@param data RSAD.Station.Data
 ---@return RSAD.Station.Status
-local function get_requester_status(self, controller, station, request, data)
-    if not data.train_limit or (station.incoming >= data.train_limit)  -- Check for already requested
+local function get_requester_status(self, controller, station, station_entity, request, data)
+    if not data.train_limit or ((station.incoming + table_size(station_entity.get_train_stop_trains())) >= data.train_limit)  -- Check for already requested
        or signal_hash(data.request) ~= request
        or not self[rsad_station_type.import][request] or next(self[rsad_station_type.import][request]) == nil then -- Make sure we have an import station for this request
         return rsad_station_status.idle end 
@@ -175,7 +176,7 @@ local function update(self, controller)
             local data_success, station_entity, data = get_station_data(station)
             if not data_success then goto continue end
 
-            local status = get_requester_status(self, controller, station, request, data)
+            local status = get_requester_status(self, controller, station, station_entity, request, data)
             local schedule_success, error
             if status == rsad_station_status.needs_request then
                 schedule_success, error = controller.scheduler:queue_station_request(station)

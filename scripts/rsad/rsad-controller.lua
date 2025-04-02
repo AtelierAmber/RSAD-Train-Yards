@@ -2,6 +2,8 @@ require("scripts.rsad.train-yard")
 require("scripts.rsad.station")
 scheduler = require("scripts.rsad.scheduler")
 require("scripts.util.events")
+---@type flib_math
+math = require("__flib__.math")
 
 local ticks_per_update = math.floor(360/settings.startup["rsad-station-update-rate"].value) + 1
 local max_train_limit = settings.startup["rsad-station-max-train-limit"].value --[[@as integer]]
@@ -358,13 +360,15 @@ end
 ---@param train LuaTrain
 ---@param old_state defines.train_state
 function rsad_controller.__on_arrive_at_station(self, station, train, old_state)
-    station.incoming = station.incoming - 1
     if station.parked_train == nil then
         self:park_train_at_station(train.id, station)
     end
     local shunter_network = self.shunter_networks[train.id]
     local yard = (shunter_network and self.train_yards[shunter_network])
     local shunting_info = (yard and yard.shunter_trains[train.id])
+    if shunting_info ~= nil then
+        station.incoming = math.max(station.incoming - 1, 0)
+    end
     local action_set = station.arrival_actions[(shunting_info and shunting_info.current_stage)] or station.arrival_actions[rsad_shunting_stage.unspecified]
     if action_set then
         local success, new_train, await = RSAD_Actions.start_actionset_execution(train, action_set, self, station)

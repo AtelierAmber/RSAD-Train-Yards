@@ -18,12 +18,11 @@ local version_migrations = {
     end
     rsad_controller:__load()
   end,
-  ["0.0.5"] = function()
+  ["0.0.6"] = function()
     for _, station in pairs(storage.stations) do
-      station.incoming = station.assignments
 ---@diagnostic disable-next-line: inject-field
       station.assignments = nil
-      ::continue::
+      station.incoming = 0
     end
     rsad_controller:__load()
   end

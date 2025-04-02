@@ -92,25 +92,25 @@ function rsad_controller.move_train(self, train, distance, direction)
     local train_end = ((direction == defines.rail_direction.front) and train.front_end) or train.back_end
     local segment_end = train_end.make_copy()
     segment_end.move_to_segment_end()
-    segment_end.flip_direction()
+    if not segment_end.move_forward(defines.rail_connection_direction.straight) then if not segment_end.move_forward(defines.rail_connection_direction.right) then segment_end.move_forward(defines.rail_connection_direction.left) end end
+    segment_end.move_to_segment_end()
+    --segment_end.flip_direction()
     local path_distance = 0
     if train_end.rail ~= segment_end.rail then
-        local path = game.train_manager.request_train_path({starts = {{rail = train_end.rail, direction = train_end.direction, allow_path_within_segment = true}}, goals = {segment_end}, shortest_path = true})
-        if not path.found_path then 
-            log({"", "Could not resolve path past train [" .. train.id .. "] to move through!"}) 
-            for _, p in pairs(game.connected_players) do p.add_alert(train.front_stock, defines.alert_type.train_no_path) end
-            return -1 
+        --local path = game.train_manager.request_train_path({starts = {{rail = train_end.rail, direction = train_end.direction, allow_path_within_segment = true}}, goals = {segment_end}, shortest_path = true})
+        local path = game.train_manager.request_train_path({train = train, goals = {segment_end}, shortest_path = true})
+        if path.found_path then 
+            path_distance = path_distance + path.total_length
         end
-        path_distance = path_distance + path.total_length
     end
     
     segment_end.flip_direction()
-    segment_end.move_natural()
+    if not segment_end.move_forward(defines.rail_connection_direction.straight) then if not segment_end.move_forward(defines.rail_connection_direction.right) then segment_end.move_forward(defines.rail_connection_direction.left) end end
     local segment_rail = segment_end.rail
     while segment_rail and path_distance < distance do
         path_distance = path_distance + segment_rail.get_rail_segment_length()
         segment_end.move_to_segment_end()
-        segment_end.move_natural()
+        if not segment_end.move_forward(defines.rail_connection_direction.straight) then if not segment_end.move_forward(defines.rail_connection_direction.right) then segment_end.move_forward(defines.rail_connection_direction.left) end end
         segment_rail = segment_end.rail
     end
     if not segment_rail or path_distance <= 0 then 

@@ -82,16 +82,16 @@ end
 
 ---@param yard RSAD.TrainYard
 ---@param item SignalID?
----@param train_limit integer
----@return RSAD.Station?
-local function get_next_providing_station(yard, item, train_limit)
+---@return RSAD.Station?, RSAD.Station.Data?
+local function get_next_providing_station(yard, item)
     local request_hash = signal_hash(item)
     local import = yard[rsad_station_type.import][request_hash] --[[@type table<uint, RSAD.Station>]]
     if not import then return nil end
 
     for unit, station in pairs(import) do
-        if station.incoming < train_limit and station.parked_train then
-            return station
+        data_success, station_entity, station_data = get_station_data(station)
+        if ((station.incoming + table_size(station_entity.get_train_stop_trains())) < station_data.train_limit) and station.parked_train then
+            return station, station_data
         end
     end
 
@@ -123,7 +123,7 @@ local function item_request_schedule(yard, requester_station)
         table.insert(new_data.scheduled_stations, 1, turnabout_station)
     end
     ---Create pickup record
-    local input_station = get_next_providing_station(yard, station_data.request, station_data.train_limit)
+    local input_station, input_station_data = get_next_providing_station(yard, station_data.request)
     if not input_station then return nil end
     data_success, station_entity, station_data = get_station_data(input_station)
     if data_success then
@@ -179,7 +179,7 @@ local function remove_wagon_schedule(yard, removal_station)
     if not parked_train then return nil end
     local front, dir = get_front_stock(parked_train, station_entity)
     local rail_end = (dir == defines.rail_direction.front and parked_train.back_end) or parked_train.front_end
-    rail_end.move_natural()
+    if not rail_end.move_forward(defines.rail_connection_direction.straight) then if not rail_end.move_forward(defines.rail_connection_direction.right) then rail_end.move_forward(defines.rail_connection_direction.left) end end
     rail_end.flip_direction()
     ---@type ScheduleRecord[]
     local pickup_record = default_rail_record(rail_end)
@@ -263,11 +263,12 @@ function scheduler.return_shunter(self, train, yard)
     local free_depot_stations = {} --[[@type table<number, RSAD.Station>]]
     for _, depot in pairs(yard[rsad_station_type.shunting_depot]) do
         ---@cast depot RSAD.Station
-        if not depot.parked_train and depot.incoming == 0 then
+        if not depot.parked_train and depot.incoming <= 0 then
             local target_entity = game.get_entity_by_unit_number(depot.unit_number)
             local target_rail = target_entity and target_entity.connected_rail
             if not target_rail then goto continue end
-            free_depot_starts[#free_depot_starts+1] = {rail = target_rail, direction = target_entity.connected_rail_direction}
+            local reversed_rail_direction = target_entity.connected_rail_direction == defines.rail_direction.back and defines.rail_direction.front or defines.rail_direction.back
+            free_depot_starts[#free_depot_starts+1] = {rail = target_rail, direction = reversed_rail_direction}
             free_depot_stations[#free_depot_stations+1] = depot
         end
         ::continue::
@@ -276,10 +277,11 @@ function scheduler.return_shunter(self, train, yard)
 
     if path.found_path then
         return_depot_start = free_depot_starts[path.start_index]
+        local reversed_rail_direction = return_depot_start.direction == defines.rail_direction.back and defines.rail_direction.front or defines.rail_direction.back
         local records = {
             [1] = {
                 rail = return_depot_start.rail,
-                rail_direction = return_depot_start.direction,
+                rail_direction = reversed_rail_direction,
                 wait_conditions = {
                     {
                         type = "time",
@@ -336,13 +338,12 @@ function scheduler.update(self)
         train.schedule = schedule
         train.manual_mode = false
 
-TODO: MIGRATION FIX INCOMING
-FIX SHUNTER PATHING 
-RESTRICT INCOMING SUBTRACTION TO SHUNTERS
-FIX SHUNTER ASSIGNMENT (?) 
-
         for _, visit in pairs(new_data.scheduled_stations) do
             visit.incoming = visit.incoming + 1
+        end
+        local parked = self.controller.station_assignments[train.id]
+        if parked then
+            self.controller:free_parked_station(parked)
         end
         shunters[train.id] = new_data
         return true

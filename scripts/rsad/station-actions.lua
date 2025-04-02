@@ -51,7 +51,6 @@ local working_scope = nil --[[@type RSAD.Actions.Scope?]]
 ---@field public scope RSAD.Actions.Scope
 local open_set = nil --[[@type RSAD.Actions.Set?]]
 
-
 ---Opens a set for edits. Following RSAD_Actions calls will modify the opened set
 function RSAD_Actions.open_set()
     assert(open_set == nil, "Cannot open multiple RSAD.Actions.Set's!")
@@ -149,9 +148,9 @@ function RSAD_Actions.exec_align(train, controller, scope, alignment)
     for i = 1, alignment.offset_num, 1 do
         carriage = next_carriage
         next_carriage = carriage and carriage.get_connected_rolling_stock((carriage.is_headed_to_trains_front and seek_dir) or ((seek_dir == defines.rail_direction.front and defines.rail_direction.back) or defines.rail_direction.front))
-        if not next_carriage then return train.id end
         local distance = (carriage and carriage.prototype.joint_distance + carriage.prototype.connection_distance) or 0
         travel_distance = travel_distance + distance
+        if not next_carriage then break end
     end
     if not alignment.continue_no_alignment and next_carriage == nil then return train.id end
     if alignment.align_side == alignment.offset_from then --Need to remove connection_distance
@@ -210,7 +209,6 @@ end
 ---@param params {}
 ---@return number new_train_id
 function RSAD_Actions.exec_leave(train, controller, scope, params)
-    if scope.station then scope.station.incoming = scope.station.incoming - 1 end
     if scope.station.parked_train == train.id then controller:free_parked_station(scope.station) end
     local schedule = train.schedule
     local current = schedule and schedule.current
@@ -276,7 +274,9 @@ local runtime_param_handlers = {
         if not entity or not entity.valid then
             local front = (train --[[@as LuaTrain]]).front_end
             local next_rail = front.make_copy()
-            if next_rail.move_natural() and front.rail.is_rail_in_same_rail_segment_as(next_rail.rail) then
+            local moved = false
+            if not next_rail.move_forward(defines.rail_connection_direction.straight) then if not next_rail.move_forward(defines.rail_connection_direction.right) then moved = next_rail.move_forward(defines.rail_connection_direction.left) else moved = true end else moved = true end
+            if moved and front.rail.is_rail_in_same_rail_segment_as(next_rail.rail) then
                 return front.direction
             end
             return (train --[[@as LuaTrain]]).back_end.direction
@@ -288,7 +288,9 @@ local runtime_param_handlers = {
         if not entity or not entity.valid then
             local front = (train --[[@as LuaTrain]]).front_end
             local next_rail = front.make_copy()
-            if next_rail.move_natural() and front.rail.is_rail_in_same_rail_segment_as(next_rail.rail) then
+            local moved = false
+            if not next_rail.move_forward(defines.rail_connection_direction.straight) then if not next_rail.move_forward(defines.rail_connection_direction.right) then moved = next_rail.move_forward(defines.rail_connection_direction.left) else moved = true end else moved = true end
+            if moved and front.rail.is_rail_in_same_rail_segment_as(next_rail.rail) then
                 return (train --[[@as LuaTrain]]).back_end.direction
             end
             return front.direction
