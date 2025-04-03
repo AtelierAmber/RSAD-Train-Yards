@@ -1,0 +1,3 @@
+rsad = {}
+
+return rsad

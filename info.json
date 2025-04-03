@@ -1,11 +1,15 @@
 {
     "name": "rsad-train-yards",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "title": "RSAD Train Yards",
     "author": "Ashierz",
     "contact": "amberatelier",
     "homepage": "https://github.com/AtelierAmber/RSAD-Train-Yards",
     "description": "RSAD: Request, Staging, Assignment, and Delivery. A train yard and inter-network train management system",
-    "dependencies": ["base", "flib"],
+    "dependencies": [
+        "base >= 2.0", 
+        "flib >= 0.15.0",
+        "gui-modules >= 0.0.6"
+    ],
     "factorio_version": "2.0"
 }

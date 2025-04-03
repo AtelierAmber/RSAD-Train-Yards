@@ -5,6 +5,10 @@
 ---@field public train_yards table<string, RSAD.TrainYard>
 storage = {}
 
+require("definitions")
+
+require("scripts.gui.gui-library")
+
 require("prototypes.names")
 rsad_controller = require("scripts.rsad.rsad-controller")
 rsad_controller:register_events()

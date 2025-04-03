@@ -1,0 +1,1 @@
+---@alias StyleMods LuaStyle|table<any,any>|nil
