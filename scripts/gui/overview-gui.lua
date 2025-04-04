@@ -1,4 +1,16 @@
 local gui = require("__gui-modules__.gui")
+local builder = require("scripts.gui.gui-library")
+
+local names = {
+    namespace = "rsad.overview-gui"
+}
+
+--MARK: window_def
+gui.new{
+    window_def = builder.make_root_window(names.namespace, 0.1){
+        
+    }
+}
 
 gui.new{ --MARK: window_def
 	window_def = {
