@@ -1,6 +1,6 @@
 local mod_gui = require("mod-gui")
-local wrapper = require("scripts.gui.gui-wrapper") --[[@as RSAD.GuiWrapper]]
-local builder = require("scripts.gui.gui-builder") --[[@as RSAD.GuiBuilder]]
+local wrapper = require("scripts.gui.lib.gui-wrapper") --[[@as RSAD.GuiWrapper]]
+local builder = require("scripts.gui.lib.gui-builder") --[[@as RSAD.GuiBuilder]]
 
 local names = {
     namespace = "rsad-overview-gui",

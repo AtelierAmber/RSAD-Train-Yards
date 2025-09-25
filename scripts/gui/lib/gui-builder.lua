@@ -1,5 +1,3 @@
-
-
 ---@class RSAD.GuiBuilder : GuiElemDef
 local builder = {}
 local builder_meta = {
@@ -136,7 +134,7 @@ end
 
 ---Creates a button
 ---@param name string
----@param handler string|table<string,string>
+---@param handler GuiEventHandler
 ---@param caption LocalisedString?
 ---@return RSAD.GuiBuilder
 function builder.button(name, handler, caption)
@@ -148,7 +146,7 @@ function builder.button(name, handler, caption)
             mouse_button_filter = {"left"},
             caption = caption,
         },
-        handler = handler
+        _click = handler
     }
     local self = builder.make(button)
     return self
@@ -168,36 +166,27 @@ function builder.make(definition)
     return definition --[[@as RSAD.GuiBuilder]]
 end
 
-local window_meta = {
-    __call = function (self, ...)
-        self.definition.children = {}
-        for _, child in pairs(...) do
-            assert(type(child) == "table", "Failed to create gui. Child, \"".. serpent.line(child) .."\" is not of type table.")
-            table.insert(self.definition.children, child)
-        end
-        return self
-    end
-}
 ---Returns current context window
 ---@param namespace string
 ---@param version number?
 ---@return RSAD.GuiBuilder
 function builder.make_window(namespace, version)
+    ---@type GuiElemDef
     local window = {
-        namespace = namespace,
-        root = "screen",
-        version = version or 1,
-        custominput = namespace,
-        --shortcut = namespace,
----@diagnostic disable-next-line: missing-fields
-        definition = {
-            type = "module", module_type = "window_frame",
-            name = namespace, title = {namespace},
-            has_close_button = true, has_pin_button = true
-        }
+        _closed = function(event)
+            event.element.destroy()
+        end,
+        --[[@type LuaGuiElement.add_param.frame]]
+        args = {
+            type = "frame",
+            name = namespace,
+            title = {"", namespace},
+        },
+        
+        has_close_button = true, has_pin_button = true
     }
-    setmetatable(window, window_meta)
-    return window --[[@as RSAD.GuiBuilder]]
+    local self = builder.make(window)
+    return self --[[@as RSAD.GuiBuilder]]
 end
 
 builder.make_window("namespace") {
