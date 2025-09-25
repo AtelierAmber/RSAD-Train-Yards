@@ -93,7 +93,7 @@ function handle_type_drop_down(e)
     local index = element.selected_index - 1
 
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
-    local circuit = control.circuit_condition
+    local circuit = control.circuit_condition or {}
     if bit32.extract(circuit.constant, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH) == index then return end 
     ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
     circuit.constant = bit32.replace(circuit.constant, index, STATION_TYPE_ID, STATION_TYPE_ID_WIDTH)
@@ -127,7 +127,7 @@ function handle_turnabout_drop_down(e)
 	if not entity or not entity.valid then return end
 
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
-    local circuit = control.circuit_condition
+    local circuit = control.circuit_condition or {}
     ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
     circuit.constant = bit32.replace(circuit.constant, index, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
     control.circuit_condition = circuit
@@ -221,10 +221,9 @@ function handle_reversed(e)
 	if not entity or not entity.valid then return end
 
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
-    local circuit = control.circuit_condition
+    local circuit = control.circuit_condition or {}
     local state_val = element.switch_state == "left" and 0 or 1
 
----@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
     circuit.constant = bit32.replace(circuit.constant, state_val, SHUNTING_DIRECTION, SHUNTING_DIRECTION_WIDTH)
     control.circuit_condition = circuit
 end
@@ -270,7 +269,7 @@ function handle_cargo_limit(e)
     end
 
     local control = entity.get_or_create_control_behavior() --[[@as LuaTrainStopControlBehavior]]
-    local circuit = control.circuit_condition
+    local circuit = control.circuit_condition or {}
     ------@diagnostic disable-next-line: undefined-field, inject-field --- CircuitCondition Changed v2.0.35
     circuit.constant = bit32.replace(circuit.constant, limit, STATION_SUBINFO, STATION_SUBINFO_WIDTH)
     control.circuit_condition = circuit
@@ -631,7 +630,7 @@ local function item_selection(entity, item, switch) return {
 ---@param reversed boolean
 ---@param subinfo integer
 ---@param item_switch string
----@return flib.GuiElemDef
+---@return GuiElemDef
 function station_gui(entity, player, selected_index, network, item, reversed, subinfo, item_switch) return {
     type = "frame",
     direction = "vertical",

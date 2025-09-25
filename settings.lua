@@ -24,6 +24,4 @@ data:extend{
     default_value = 8,
     order = "c"
   },
-  --gui-modules registration
-  require("scripts.gui.modules"),
 }

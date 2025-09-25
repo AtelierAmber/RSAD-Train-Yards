@@ -7,16 +7,21 @@ storage = {}
 
 require("definitions")
 
-require("scripts.gui.gui-library")
 
-require("prototypes.names")
-rsad_controller = require("scripts.rsad.rsad-controller")
-rsad_controller:register_events()
+local handler = require("__core__.lualib.event_handler")
+handler.add_libraries(require("scripts.rsad-gui"))
+handler.add_libraries{
+    require("scripts.rsad-gui"),
+}
 
-require("scripts.migration")
+-- require("prototypes.names")
+-- rsad_controller = require("scripts.rsad.rsad-controller")
+-- rsad_controller:register_events()
 
-require("scripts.gui.events")
-require("scripts.gui.station-gui")
+-- require("scripts.migration")
 
-require("scripts.util.events")
-events.init()
+-- require("scripts.gui.events")
+-- require("scripts.gui.station-gui")
+
+-- require("scripts.util.events")
+-- events.init()

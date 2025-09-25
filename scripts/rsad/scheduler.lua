@@ -267,6 +267,7 @@ function scheduler.return_shunter(self, train, yard)
             local target_entity = game.get_entity_by_unit_number(depot.unit_number)
             local target_rail = target_entity and target_entity.connected_rail
             if not target_rail then goto continue end
+            ---@diagnostic disable-next-line: need-check-nil --- target_entity must be notnil if target_rail is not nil
             local reversed_rail_direction = target_entity.connected_rail_direction == defines.rail_direction.back and defines.rail_direction.front or defines.rail_direction.back
             free_depot_starts[#free_depot_starts+1] = {rail = target_rail, direction = reversed_rail_direction}
             free_depot_stations[#free_depot_stations+1] = depot
