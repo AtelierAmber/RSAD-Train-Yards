@@ -60,7 +60,7 @@ end
 ---Standard Horizontal Flow Definition
 ---@param name string?
 ---@param style string?
----@param mods StyleMods
+---@param mods StyleMods?
 ---@return RSAD.GuiBuilder
 function builder.hflow(name, style, mods)
     ---@type GuiElemDef
@@ -80,7 +80,7 @@ end
 ---Standard Horizontal Flow Definition
 ---@param name string?
 ---@param style string?
----@param mods StyleMods
+---@param mods StyleMods?
 ---@return RSAD.GuiBuilder
 function builder.vflow(name, style, mods)
     ---@type GuiElemDef
@@ -122,10 +122,12 @@ end
 function builder.label(caption, name, style, mods)
     ---@type GuiElemDef
     local label = {
-        type = "label",
-        name = name,
-        style = style or "label",
-        caption = caption,
+        args = {
+            type = "label",
+            name = name,
+            style = style or "label",
+            caption = caption,
+        },
         style_mods = mods,
     }
     local self = builder.make(label)
@@ -140,10 +142,12 @@ end
 function builder.button(name, handler, caption)
     ---@type GuiElemDef
     local button = {
-        type = "button",
-        name = name,
-        mouse_button_filter = {"left"},
-        caption = caption,
+        args = {
+            type = "button",
+            name = name,
+            mouse_button_filter = {"left"},
+            caption = caption,
+        },
         handler = handler
     }
     local self = builder.make(button)
