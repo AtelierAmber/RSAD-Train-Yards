@@ -11,7 +11,7 @@ local handler = require("__core__.lualib.event_handler")
 
 -- Core
 handler.add_libraries({
-    require("scripts.rsad")
+  require("scripts.rsad")
 })
 
 -- GUI

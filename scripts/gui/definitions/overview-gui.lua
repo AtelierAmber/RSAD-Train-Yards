@@ -3,8 +3,8 @@ local wrapper = require("scripts.gui.lib.gui-wrapper") --[[@as RSAD.GuiWrapper]]
 local builder = require("scripts.gui.lib.gui-builder") --[[@as RSAD.GuiBuilder]]
 
 local names = {
-    namespace = "rsad-overview-gui",
-    mod_button = "mod-gui-button"
+  namespace = "rsad-overview-gui",
+  mod_button = "mod-gui-button"
 }
 
 --MARK: window_def
@@ -14,7 +14,7 @@ local names = {
 --     },
 --     state_setup = function (state)
 -- 		--MARK: Window setup
-    
+
 --         ---@cast state RSAD.OverviewState
 --         local mod_button = mod_gui.get_button_flow(state.player)[names.mod_button]
 --         if mod_button then mod_button.destroy() end
@@ -207,7 +207,7 @@ local names = {
 -- 			for _, type in pairs{"item","fluid"} do
 -- 				local table = state.selector_table[selected_index.."_"..type.."_selection"] or {}
 -- 				for index, value in pairs(table) do
--- 					if lib.type(index) == "number" then 
+-- 					if lib.type(index) == "number" then
 -- 						---@cast value string
 -- 						new_calculated[#new_calculated+1] = lib.item(value, type)
 -- 					end

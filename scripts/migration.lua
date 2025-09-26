@@ -12,7 +12,7 @@ local version_migrations = {
   end,
   ["0.0.4"] = function()
     for _, station in pairs(storage.stations) do
-      update_station_data(station, {train_limit = 1})
+      update_station_data(station, { train_limit = 1 })
       station.incoming = 0
       ::continue::
     end
@@ -20,7 +20,7 @@ local version_migrations = {
   end,
   ["0.0.6"] = function()
     for _, station in pairs(storage.stations) do
----@diagnostic disable-next-line: inject-field
+      ---@diagnostic disable-next-line: inject-field
       station.assignments = nil
       station.incoming = 0
     end
