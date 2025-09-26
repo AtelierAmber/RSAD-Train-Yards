@@ -1,11 +1,22 @@
 ---@class RSAD.GuiBuilder : GuiElemDef
+---@field handlers? GuiEventHandler[]
 local builder = {}
 local builder_meta = {
+    ---Use {} from a return function of builder to initialize children 
+    ---@param self RSAD.GuiBuilder
+    ---@return RSAD.GuiBuilder
     __call = function (self, ...)
-        self.children = {}
+        self.children = self.children or {}
+        self.handlers = self.handlers or {}
         for _, child in pairs(...) do
             assert(type(child) == "table", "Failed to create gui. Child, \"".. serpent.line(child) .."\" is not of type table.")
             table.insert(self.children, child)
+            if child.handlers then
+                for _, handler in pairs(child.handlers) do
+                    table.insert(self.handlers, handler)
+                end
+                child.handlers = nil
+            end
         end
         return self
     end
@@ -17,8 +28,9 @@ local builder_meta = {
 ---@param vertical boolean? If true, sets the frame to vertical, otherwise horizontal
 ---@param stylemods StyleMods?
 function builder.frame(name, style, vertical, stylemods)
-    ---@type GuiElemDef
+    ---@type RSAD.GuiBuilder
     local frame = {
+        --[[@type LuaGuiElement.add_param.frame]]
         args = {
             type = "frame",
             name = name,
@@ -40,8 +52,9 @@ end
 ---@param mods StyleMods
 ---@return RSAD.GuiBuilder
 function builder.table(column_count, name, style, draw_vertical_lines, draw_horizontal_lines, mods)
-    ---@type GuiElemDef
+    ---@type RSAD.GuiBuilder
     local frame = {
+        --[[@type LuaGuiElement.add_param.table]]
         args = {
             type = "table",
             name = name,
@@ -61,8 +74,9 @@ end
 ---@param mods StyleMods?
 ---@return RSAD.GuiBuilder
 function builder.hflow(name, style, mods)
-    ---@type GuiElemDef
+    ---@type RSAD.GuiBuilder
     local flow = {
+        --[[@type LuaGuiElement.add_param.flow]]
         args = {
             type = "flow",
             name = name,
@@ -81,8 +95,9 @@ end
 ---@param mods StyleMods?
 ---@return RSAD.GuiBuilder
 function builder.vflow(name, style, mods)
-    ---@type GuiElemDef
+    ---@type RSAD.GuiBuilder
     local flow = {
+        --[[@type LuaGuiElement.add_param.flow]]
         args = {
             type = "flow",
             name = name,
@@ -100,8 +115,9 @@ end
 ---@param h boolean? Is horizontally stretchable. Defaults to true
 ---@return RSAD.GuiBuilder
 function builder.spacer(v, h)
-    ---@type GuiElemDef
+    ---@type RSAD.GuiBuilder
     local spacer = {
+        --[[@type LuaGuiElement.add_param.base]]
         args = {
             type = "empty-widget",
         },
@@ -118,8 +134,9 @@ end
 ---@param mods StyleMods?
 ---@return RSAD.GuiBuilder
 function builder.label(caption, name, style, mods)
-    ---@type GuiElemDef
+    ---@type RSAD.GuiBuilder
     local label = {
+        --[[@type LuaGuiElement.add_param.base]]
         args = {
             type = "label",
             name = name,
@@ -138,8 +155,9 @@ end
 ---@param caption LocalisedString?
 ---@return RSAD.GuiBuilder
 function builder.button(name, handler, caption)
-    ---@type GuiElemDef
+    ---@type RSAD.GuiBuilder
     local button = {
+        --[[@type LuaGuiElement.add_param.button]]
         args = {
             type = "button",
             name = name,
@@ -148,6 +166,8 @@ function builder.button(name, handler, caption)
         },
         _click = handler
     }
+    button.handlers = {}
+    button.handlers[(name .. "._click")] = handler
     local self = builder.make(button)
     return self
 end
@@ -168,10 +188,11 @@ end
 
 ---Returns current context window
 ---@param namespace string
----@param version number?
+---@param min_size integer|integer[]?
+---@param center boolean?
 ---@return RSAD.GuiBuilder
-function builder.make_window(namespace, version)
-    ---@type GuiElemDef
+function builder.make_window(namespace, min_size, center)
+    ---@type RSAD.GuiBuilder
     local window = {
         _closed = builder.default_handlers.window_close,
         --[[@type LuaGuiElement.add_param.frame]]
@@ -180,9 +201,14 @@ function builder.make_window(namespace, version)
             name = namespace,
             title = {"", namespace},
         },
-        
-        has_close_button = true, has_pin_button = true
+        style_mods = {
+            size = min_size or {1,1},
+        },
+        elem_mods = {
+            auto_center = center or false,
+        }
     }
+    window.handlers = { builder.default_handlers.window_close }
     local self = builder.make(window)
     return self --[[@as RSAD.GuiBuilder]]
 end

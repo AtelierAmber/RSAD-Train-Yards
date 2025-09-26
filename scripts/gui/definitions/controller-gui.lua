@@ -2,18 +2,26 @@ require("scripts.gui.definitions.overview-gui")
 
 rsad.controller.gui = {}
 rsad.controller.gui.names = {
-    namespace = "rsad-overview-gui",
+    namespace = "rsad-controller",
     mod_button = "mod-gui-button"
 }
 local builder = require("scripts.gui.lib.gui-builder")
-glib.register_handlers(builder.default_handlers)
 
--- Need to move handlers to a compiled table from builder
-local handlers = {}
+--Main Frame
+---@type RSAD.GuiBuilder
+local main_frame = builder.make_window(rsad.controller.gui.names.namespace, {100,100}, true){
+    builder.hflow(){
+        builder.label("test")
+    }
+    --require("scripts.gui.definitions.overview-gui")
+}
 
 ---@param event EventData.on_gui_click
-function handlers.click (event)
-    glib.add(game.get_player(event.player_index).gui.screen, builder.make_window("test"))
+local function click (event)
+    glib.add(game.get_player(event.player_index).gui.screen, main_frame)
 end
-wrapper.new_mod_gui(builder.button(names.mod_button, handlers.click, {"", "GUI-SUX"}))
-glib.register_handlers(handlers)
+local mod_button = builder.button(rsad.controller.gui.names.mod_button, click, {"", "GUI-SUX"})
+wrapper.new_mod_gui(mod_button)
+
+glib.register_handlers(mod_button.handlers, nil, rsad.controller.gui.names.mod_button)
+glib.register_handlers(main_frame.handlers, nil, rsad.controller.gui.names.namespace)
