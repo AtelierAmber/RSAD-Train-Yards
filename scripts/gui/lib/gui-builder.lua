@@ -173,9 +173,7 @@ end
 function builder.make_window(namespace, version)
     ---@type GuiElemDef
     local window = {
-        _closed = function(event)
-            event.element.destroy()
-        end,
+        _closed = builder.default_handlers.window_close,
         --[[@type LuaGuiElement.add_param.frame]]
         args = {
             type = "frame",
@@ -188,6 +186,15 @@ function builder.make_window(namespace, version)
     local self = builder.make(window)
     return self --[[@as RSAD.GuiBuilder]]
 end
+
+--MARK: Default Handlers
+builder.default_handlers = {}
+
+function builder.default_handlers.window_close(event)
+    event.element.destroy()
+end
+
+---
 
 builder.make_window("namespace") {
     builder.hflow() {

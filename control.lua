@@ -11,9 +11,13 @@ require("definitions")
 local handler = require("__core__.lualib.event_handler")
 
 handler.add_libraries(require("scripts.rsad-gui"))
-handler.add_libraries{
+handler.add_libraries({
 
-}
+})
+
+script.on_event(defines.events.on_player_changed_position, function(e) 
+    game.print("end")
+end)
 
 -- require("prototypes.names")
 -- rsad_controller = require("scripts.rsad.rsad-controller")

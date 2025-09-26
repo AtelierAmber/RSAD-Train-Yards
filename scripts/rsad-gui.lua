@@ -12,9 +12,12 @@ local names = {
     mod_button = "mod-gui-button"
 }
 local builder = require("scripts.gui.lib.gui-builder")
+glib.register_handlers(builder.default_handlers)
 
 -- Need to move handlers to a compiled table from builder
 local handlers = {}
+
+---@param event EventData.on_gui_click
 function handlers.click (event)
     glib.add(game.get_player(event.player_index).gui.screen, builder.make_window("test"))
 end
@@ -23,8 +26,8 @@ glib.register_handlers(handlers)
 --=
 
 local gui_handlers = {
-    glib,
     wrapper,
+    glib,
 }
 
 return gui_handlers

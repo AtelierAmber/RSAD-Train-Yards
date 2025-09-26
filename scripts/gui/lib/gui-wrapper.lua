@@ -23,26 +23,30 @@ function wrapper.new_mod_gui(definition)
 end
 
 function wrapper.create_with_scope(player)
-    for _, button in wrapper.overlay_buttons do
+    for _, button in pairs(wrapper.overlay_buttons) do
         local mod_button = mod_gui.get_button_flow(player)
         if mod_button[button.name] then mod_button[button.name].destroy() end
         glib.add(mod_button, button.definition)
     end
-    for _, frame in wrapper.overlay_frames do
+    for _, frame in pairs(wrapper.overlay_frames) do
         local mod_frame = mod_gui.get_frame_flow(player)
         if mod_frame[frame.name] then mod_frame[frame.name].destroy() end
         glib.add(mod_frame, frame.definition)
     end
 end
 
----@param event EventData.on_player_created
-function wrapper.on_player_created(event)
-    local player = game.get_player(event.player_index)
-    wrapper.create_with_scope(player)
+function wrapper.on_init()
+    for i, player in pairs(game.players) do
+        wrapper.create_with_scope(player)
+    end
+end
+
+function wrapper.on_configuration_changed()
+    wrapper.on_init()
 end
 
 wrapper.events = {
-    [defines.events.on_player_created] = wrapper.on_player_created,
+    
 }
 
 return wrapper
