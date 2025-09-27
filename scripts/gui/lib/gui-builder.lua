@@ -12,6 +12,7 @@ local builder_meta = {
       assert(type(child) == "table", "Failed to create gui. Child, \"" ..
       serpent.line(child) .. "\" is not of type table.")
       table.insert(self.children, child)
+      child.parent = self
       if child.handlers then
         for _, handler in pairs(child.handlers) do
           table.insert(self.handlers, handler)
@@ -36,7 +37,7 @@ function builder.frame(name, style, vertical, stylemods)
       type = "frame",
       name = name,
       style = style,
-      direction = (vertical and "vertical") or "horizontal",
+      direction = ((vertical ~= nil) and ((vertical and "vertical") or "horizontal")) or nil,
     },
     style_mods = mods,
   }
@@ -114,16 +115,25 @@ end
 ---Size filling spacer
 ---@param v boolean? Is vertically stretchable. Defaults to false
 ---@param h boolean? Is horizontally stretchable. Defaults to true
+---@param name string?
+---@param style string?
+---@param mods StyleMods?
+---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.spacer(v, h)
+function builder.spacer(v, h, name, style, mods, emods)
   ---@type RSAD.GuiBuilder
   local spacer = {
     --[[@type LuaGuiElement.add_param.base]]
     args = {
       type = "empty-widget",
+      name = name,
+      style = style,
     },
-    style_mods = { horizontally_stretchable = (h ~= nil and h) or true, vertically_stretchable = v } --[[@type StyleMods]]
+    style_mods = mods or {},
+    elem_mods = emods
   }
+  spacer.style_mods.horizontally_stretchable = (h ~= nil and h)
+  spacer.style_mods.vertically_stretchable = v
   local self = builder.make(spacer)
   return self
 end
@@ -133,8 +143,9 @@ end
 ---@param name string?
 ---@param style string?
 ---@param mods StyleMods?
+---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.label(caption, name, style, mods)
+function builder.label(caption, name, style, mods, emods)
   ---@type RSAD.GuiBuilder
   local label = {
     --[[@type LuaGuiElement.add_param.base]]
@@ -145,6 +156,7 @@ function builder.label(caption, name, style, mods)
       caption = caption,
     },
     style_mods = mods,
+    elem_mods = emods,
   }
   local self = builder.make(label)
   return self
@@ -191,9 +203,8 @@ end
 ---Returns current context window
 ---@param namespace string
 ---@param min_size integer|integer[]?
----@param center boolean?
 ---@return RSAD.GuiBuilder
-function builder.make_window(namespace, min_size, center)
+function builder.make_window(namespace, min_size)
   ---@type RSAD.GuiBuilder
   local window = {
     _closed = builder.default_handlers.window_close,
@@ -201,19 +212,40 @@ function builder.make_window(namespace, min_size, center)
     args = {
       type = "frame",
       name = namespace,
-      title = { "", namespace },
+      caption = { "", namespace },
+      style = "frame"
     },
     style_mods = {
-      size = min_size or { 1, 1 },
-    },
-    elem_mods = {
-      auto_center = center or false,
+      minimal_width = (min_size and min_size[1]) or 1,
+      minimal_height = (min_size and min_size[2]) or 1,
+      vertically_stretchable = true,
+      horizontally_stretchable = true,
     }
   }
   window.handlers = { builder.default_handlers.window_close }
   local self = builder.make(window)
   return self --[[@as RSAD.GuiBuilder]]
 end
+
+
+--MARK: Modifiers
+--- ElemMod accessors
+
+---
+
+---Centers the element with auto_center
+---@param self RSAD.GuiBuilder
+---@return RSAD.GuiBuilder
+function builder:center()
+  self.elem_mods = self.elem_mods or {}
+  self.elem_mods.auto_center = true
+  return self
+end
+
+builder_meta.__index = {
+  center = builder.center,
+}
+--
 
 --MARK: Default Handlers
 builder.default_handlers = {}
