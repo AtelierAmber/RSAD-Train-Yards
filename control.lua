@@ -15,7 +15,7 @@ handler.add_libraries({
 })
 
 -- GUI
-handler.add_libraries(require("scripts.rsad-gui"))
+handler.add_libraries(require("scripts.gui.rsad-gui"))
 
 -- require("prototypes.names")
 -- rsad_controller = require("scripts.rsad.rsad-controller")

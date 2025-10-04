@@ -1,5 +1,9 @@
+---@alias RSAD.GuiBuilder.Constructor fun(self:LuaGuiElement, ...)
+
 ---@class RSAD.GuiBuilder : GuiElemDef
 ---@field handlers? GuiEventHandler[]
+---@field center? fun(self:RSAD.GuiBuilder):RSAD.GuiBuilder
+---@field with_construction? fun(self:RSAD.GuiBuilder, name:string, constructor:RSAD.GuiBuilder.Constructor):RSAD.GuiBuilder
 local builder = {}
 local builder_meta = {
   ---Use {} from a return function of builder to initialize children
@@ -8,10 +12,28 @@ local builder_meta = {
   __call = function(self, ...)
     self.children = self.children or {}
     self.handlers = self.handlers or {}
-    for _, child in pairs(...) do
-      assert(type(child) == "table", "Failed to create gui. Child, \"" ..
-      serpent.line(child) .. "\" is not of type table.")
-      table.insert(self.children, child)
+    if not self.tab then
+      for _, child in pairs(...) do
+        assert(type(child) == "table" and (child.args or child.tab), "Failed to create gui. Child, \"" ..
+          serpent.line(child) .. "\" is not of type table.")
+        if child.tab then assert(self.args.type == "tabbed-pane", "Parent of tabs must be a tabbed-pane!") end
+        table.insert(self.children, child)
+        child.parent = self
+        if child.handlers then
+          for _, handler in pairs(child.handlers) do
+            table.insert(self.handlers, handler)
+          end
+          child.handlers = nil
+        end
+      end
+    else
+      if #... > 1 then
+        error("Trying to construct tab with multiple content frames!")
+        return self
+      end
+      local child = select(1, ...)[1]
+      assert(type(child) == "table" and (child.args or child.tab), "Failed to create gui. Child, \"" ..
+        serpent.line(child) .. "\" is not of type table.")
       child.parent = self
       if child.handlers then
         for _, handler in pairs(child.handlers) do
@@ -19,6 +41,7 @@ local builder_meta = {
         end
         child.handlers = nil
       end
+      self.content = child
     end
     return self
   end
@@ -138,6 +161,30 @@ function builder.spacer(v, h, name, style, mods, emods)
   return self
 end
 
+---Draggable
+---@param name string?
+---@param target string?
+---@param mods StyleMods?
+---@param emods ElemMods?
+---@return RSAD.GuiBuilder
+function builder.dragger(name, target, mods, emods)
+  ---@type RSAD.GuiBuilder
+  local spacer = {
+    --[[@type LuaGuiElement.add_param.base]]
+    args = {
+      type = "empty-widget",
+      name = name,
+      style = "draggable_space",
+    },
+    style_mods = mods or {},
+    elem_mods = emods,
+    drag_target = target,
+  }
+  spacer.style_mods.horizontally_stretchable = true
+  local self = builder.make(spacer)
+  return self
+end
+
 ---Standard Horizontal Flow Definition
 ---@param caption LocalisedString
 ---@param name string?
@@ -185,6 +232,42 @@ function builder.button(name, handler, caption)
   return self
 end
 
+---Creates a tab within the parent frame. Must have only a single child which is the content frame
+---@param name string?
+---@param style string?
+---@return RSAD.GuiBuilder
+function builder.tabbed_pane(name, style)
+  ---@type RSAD.GuiBuilder
+  local pane = {
+    --[[@type LuaGuiElement.add_param]]
+    args = {
+      type = "tabbed-pane",
+      style = style or nil,
+    }
+  }
+  local self = builder.make(pane)
+  return self
+end
+
+---Creates a tab within the parent frame. Must have only a single child which is the content frame
+---@param name string
+---@return RSAD.GuiBuilder
+function builder.tab(name)
+  local tab = {
+    ---@type RSAD.GuiBuilder
+    tab = {
+      --[[@type LuaGuiElement.add_param.tab]]
+      args = {
+        type = "tab",
+        name = name,
+        caption = {"", "test"}
+      }
+    }
+  }
+  local self = builder.make(tab)
+  return self
+end
+
 ---Allows for a custom GUI element definition to be added
 ---@param definition GuiElemDef
 ---@return RSAD.GuiBuilder
@@ -227,7 +310,6 @@ function builder.make_window(namespace, min_size)
   return self --[[@as RSAD.GuiBuilder]]
 end
 
-
 --MARK: Modifiers
 --- ElemMod accessors
 
@@ -242,8 +324,31 @@ function builder:center()
   return self
 end
 
+---Registers a constructor that can be called after add
+---@param self RSAD.GuiBuilder
+---@param name string
+---@param constructor RSAD.GuiBuilder.Constructor
+---@return RSAD.GuiBuilder
+function builder:with_construction(name, constructor)
+  if self.class then
+    error("Trying to register GUIBuilder class to a gui twice!")
+    return self
+  end
+
+  glib.register_class(name, {construct = function (elem)
+    constructor(elem)
+  end})
+  --self.class = name
+
+  return self
+end
+
+---@class RSAD.GuiBuilderMeta.Index
+---@field center fun(self:RSAD.GuiBuilder)
+---@field with_construction fun(self:RSAD.GuiBuilder, name:string, constructor:fun(self:LuaGuiElement, ...))
 builder_meta.__index = {
   center = builder.center,
+  with_construction = builder.with_construction,
 }
 --
 
@@ -255,24 +360,5 @@ function builder.default_handlers.window_close(event)
 end
 
 ---
-
-builder.make_window("namespace") {
-  builder.hflow() {
-    builder.label({ "label1" }),
-    builder.spacer(),
-    builder.label({ "label2" })
-  },
-  builder.hflow() {
-    builder.vflow() {
-      builder.label({ "label11" }),
-      builder.label({ "label12" })
-    },
-    builder.spacer(),
-    builder.vflow() {
-      builder.label({ "label21" }),
-      builder.label({ "label22" }),
-    }
-  }
-}
 
 return builder --[[@as RSAD.GuiBuilder]]
