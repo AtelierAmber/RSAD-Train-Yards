@@ -19,6 +19,18 @@ local pairs = pairs
 
 --#endregion
 
+rsad.controller.train_yards = {
+  {name = "Yard A"},
+  {name = "Yard B"},
+  {name = "Yard C"},
+  {name = "Yard D"},
+  {name = "Yard E"},
+}
+
+if true then
+  return -- Skip remaining for testing
+end
+
 ---@class RSAD.Controller
 rsad_controller = {
   stations = nil, --[[@type table<uint, RSAD.Station>]]

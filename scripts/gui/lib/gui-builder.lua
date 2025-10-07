@@ -20,8 +20,21 @@ local builder_meta = {
         table.insert(self.children, child)
         child.parent = self
         if child.handlers then
-          for _, handler in pairs(child.handlers) do
-            table.insert(self.handlers, handler)
+          for hname, handler in pairs(child.handlers) do
+            local found = false
+            for exname, existing in pairs(self.handlers) do
+              if existing == handler then
+                found = true
+              end
+              if exname == hname then
+                error("Failed to make handler " .. hname .. " since it already exists in this element!")
+              end
+            end
+            if not found then
+              self.handlers[hname] = handler
+            else
+              self.handlers[hname] = function(evnt) handler(evnt) end
+            end
           end
           child.handlers = nil
         end
@@ -36,8 +49,21 @@ local builder_meta = {
         serpent.line(child) .. "\" is not of type table.")
       child.parent = self
       if child.handlers then
-        for _, handler in pairs(child.handlers) do
-          table.insert(self.handlers, handler)
+        for hname, handler in pairs(child.handlers) do
+          local found = false
+          for exname, existing in pairs(self.handlers) do
+            if existing == handler then
+              found = true
+            end
+            if exname == hname then
+              error("Failed to make handler " .. hname .. " since it already exists in this element!")
+            end
+          end
+          if not found then
+            self.handlers[hname] = handler
+          else
+            self.handlers[hname] = function(evnt) handler(evnt) end
+          end
         end
         child.handlers = nil
       end
@@ -52,7 +78,8 @@ local builder_meta = {
 ---@param style string?
 ---@param vertical boolean? If true, sets the frame to vertical, otherwise horizontal
 ---@param stylemods StyleMods?
-function builder.frame(name, style, vertical, stylemods)
+---@param emods ElemMods?
+function builder.frame(name, style, vertical, stylemods, emods)
   ---@type RSAD.GuiBuilder
   local frame = {
     --[[@type LuaGuiElement.add_param.frame]]
@@ -62,7 +89,8 @@ function builder.frame(name, style, vertical, stylemods)
       style = style,
       direction = ((vertical ~= nil) and ((vertical and "vertical") or "horizontal")) or nil,
     },
-    style_mods = mods,
+    style_mods = stylemods,
+    elem_mods = emods
   }
   local self = builder.make(frame)
   return self
@@ -74,9 +102,10 @@ end
 ---@param style string?
 ---@param draw_vertical_lines boolean?
 ---@param draw_horizontal_lines boolean?
----@param mods StyleMods
+---@param stylemods StyleMods?
+---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.table(column_count, name, style, draw_vertical_lines, draw_horizontal_lines, mods)
+function builder.table(column_count, name, style, draw_vertical_lines, draw_horizontal_lines, stylemods, emods)
   ---@type RSAD.GuiBuilder
   local frame = {
     --[[@type LuaGuiElement.add_param.table]]
@@ -84,10 +113,12 @@ function builder.table(column_count, name, style, draw_vertical_lines, draw_hori
       type = "table",
       name = name,
       style = style,
+      column_count = column_count,
       draw_vertical_lines = draw_vertical_lines,
       draw_horizontal_lines = draw_horizontal_lines,
     },
-    style_mods = mods,
+    style_mods = stylemods,
+    elem_mods = emods
   }
   local self = builder.make(frame)
   return self
@@ -96,9 +127,9 @@ end
 ---Standard Horizontal Flow Definition
 ---@param name string?
 ---@param style string?
----@param mods StyleMods?
+---@param stylemods StyleMods?
 ---@return RSAD.GuiBuilder
-function builder.hflow(name, style, mods)
+function builder.hflow(name, style, stylemods)
   ---@type RSAD.GuiBuilder
   local flow = {
     --[[@type LuaGuiElement.add_param.flow]]
@@ -108,7 +139,7 @@ function builder.hflow(name, style, mods)
       style = style,
       direction = "horizontal",
     },
-    style_mods = mods,
+    style_mods = stylemods,
   }
   local self = builder.make(flow)
   return self
@@ -117,9 +148,9 @@ end
 ---Standard Horizontal Flow Definition
 ---@param name string?
 ---@param style string?
----@param mods StyleMods?
+---@param stylemods StyleMods?
 ---@return RSAD.GuiBuilder
-function builder.vflow(name, style, mods)
+function builder.vflow(name, style, stylemods)
   ---@type RSAD.GuiBuilder
   local flow = {
     --[[@type LuaGuiElement.add_param.flow]]
@@ -129,9 +160,80 @@ function builder.vflow(name, style, mods)
       style = style,
       direction = "vertical",
     },
-    style_mods = mods,
+    style_mods = stylemods,
   }
   local self = builder.make(flow)
+  return self
+end
+
+---Standard scroll frame
+---@param name string?
+---@param vbehavior ScrollPolicy?
+---@param hbehavior ScrollPolicy?
+---@param style string?
+---@param stylemods StyleMods?
+---@return RSAD.GuiBuilder
+function builder.scroll(name, vbehavior, hbehavior, style, stylemods)
+  ---@type RSAD.GuiBuilder
+  local flow = {
+    --[[@type LuaGuiElement.add_param.scroll_pane]]
+    args = {
+      type = "scroll-pane",
+      name = name,
+      style = style,
+      horizontal_scroll_policy = hbehavior or "auto-and-reserve-space",
+      vertical_scroll_policy = vbehavior or "auto-and-reserve-space"
+    },
+    style_mods = stylemods,
+  }
+  local self = builder.make(flow)
+  return self
+end
+
+---Standard Horizontal scroll frame
+---@param name string?
+---@param behavior ScrollPolicy?
+---@param style string?
+---@param stylemods StyleMods?
+---@return RSAD.GuiBuilder
+function builder.vscroll(name, behavior, style, stylemods)
+  ---@type RSAD.GuiBuilder
+  local flow = {
+    --[[@type LuaGuiElement.add_param.scroll_pane]]
+    args = {
+      type = "scroll-pane",
+      name = name,
+      style = style,
+      horizontal_scroll_policy = "never",
+      vertical_scroll_policy = behavior or "auto-and-reserve-space"
+    },
+    style_mods = stylemods,
+  }
+  local self = builder.make(flow)
+  return self
+end
+
+---Standard Horizontal scroll frame
+---@param name string?
+---@param behavior ScrollPolicy?
+---@param style string?
+---@param stylemods StyleMods?
+---@return RSAD.GuiBuilder
+function builder.hscroll(name, behavior, style, stylemods)
+  ---@type RSAD.GuiBuilder
+  local pane = {
+    --[[@type LuaGuiElement.add_param.scroll_pane]]
+    args = {
+      type = "scroll-pane",
+      name = name,
+      style = style,
+      horizontal_scroll_policy = behavior or "auto-and-reserve-space",
+      vertical_scroll_policy = "never",
+      
+    },
+    style_mods = stylemods,
+  }
+  local self = builder.make(pane)
   return self
 end
 
@@ -140,10 +242,10 @@ end
 ---@param h boolean? Is horizontally stretchable. Defaults to true
 ---@param name string?
 ---@param style string?
----@param mods StyleMods?
+---@param stylemods StyleMods?
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.spacer(v, h, name, style, mods, emods)
+function builder.spacer(v, h, name, style, stylemods, emods)
   ---@type RSAD.GuiBuilder
   local spacer = {
     --[[@type LuaGuiElement.add_param.base]]
@@ -152,7 +254,7 @@ function builder.spacer(v, h, name, style, mods, emods)
       name = name,
       style = style,
     },
-    style_mods = mods or {},
+    style_mods = stylemods or {},
     elem_mods = emods
   }
   spacer.style_mods.horizontally_stretchable = (h ~= nil and h)
@@ -164,10 +266,10 @@ end
 ---Draggable
 ---@param name string?
 ---@param target string?
----@param mods StyleMods?
+---@param stylemods StyleMods?
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.dragger(name, target, mods, emods)
+function builder.dragger(name, target, stylemods, emods)
   ---@type RSAD.GuiBuilder
   local spacer = {
     --[[@type LuaGuiElement.add_param.base]]
@@ -176,7 +278,7 @@ function builder.dragger(name, target, mods, emods)
       name = name,
       style = "draggable_space",
     },
-    style_mods = mods or {},
+    style_mods = stylemods or {},
     elem_mods = emods,
     drag_target = target,
   }
@@ -189,10 +291,10 @@ end
 ---@param caption LocalisedString
 ---@param name string?
 ---@param style string?
----@param mods StyleMods?
+---@param stylemods StyleMods?
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.label(caption, name, style, mods, emods)
+function builder.label(caption, name, style, stylemods, emods)
   ---@type RSAD.GuiBuilder
   local label = {
     --[[@type LuaGuiElement.add_param.base]]
@@ -202,7 +304,7 @@ function builder.label(caption, name, style, mods, emods)
       style = style or "label",
       caption = caption,
     },
-    style_mods = mods,
+    style_mods = stylemods,
     elem_mods = emods,
   }
   local self = builder.make(label)
@@ -212,18 +314,28 @@ end
 ---Creates a button
 ---@param name string
 ---@param handler GuiEventHandler
+---@param style string?
 ---@param caption LocalisedString?
+---@param tooltip LocalisedString?
+---@param sprite string?
+---@param stylemods StyleMods?
+---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.button(name, handler, caption)
+function builder.button(name, handler, style, caption, tooltip, sprite, stylemods, emods)
   ---@type RSAD.GuiBuilder
   local button = {
     --[[@type LuaGuiElement.add_param.button]]
     args = {
-      type = "button",
+      type = sprite and "sprite-button" or "button",
       name = name,
       mouse_button_filter = { "left" },
       caption = caption,
+      tooltip = tooltip,
+      style = style,
+      sprite = sprite
     },
+    style_mods = stylemods,
+    elem_mods = emods,
     _click = handler
   }
   button.handlers = {}
@@ -232,18 +344,43 @@ function builder.button(name, handler, caption)
   return self
 end
 
----Creates a tab within the parent frame. Must have only a single child which is the content frame
+---Creates a checkbox
+---@param name string?
+---@param state boolean?
+---@param style string?
+---@param stylemods StyleMods?
+---@return RSAD.GuiBuilder
+function builder.checkbox(name, state, style, stylemods)
+  ---@type RSAD.GuiBuilder
+  local pane = {
+    --[[@type LuaGuiElement.add_param.checkbox]]
+    args = {
+      type = "checkbox",
+      name = name,
+      style = style,
+      state = state or false
+    },
+    style_mods = stylemods
+  }
+  local self = builder.make(pane)
+  return self
+end
+
+---Creates a tabbed pane for use with tabs.
 ---@param name string?
 ---@param style string?
+---@param stylemods StyleMods?
 ---@return RSAD.GuiBuilder
-function builder.tabbed_pane(name, style)
+function builder.tabbed_pane(name, style, stylemods)
   ---@type RSAD.GuiBuilder
   local pane = {
     --[[@type LuaGuiElement.add_param]]
     args = {
       type = "tabbed-pane",
-      style = style or nil,
-    }
+      name = name,
+      style = style,
+    },
+    style_mods = stylemods
   }
   local self = builder.make(pane)
   return self
@@ -251,8 +388,9 @@ end
 
 ---Creates a tab within the parent frame. Must have only a single child which is the content frame
 ---@param name string
+---@param label LocalisedString?
 ---@return RSAD.GuiBuilder
-function builder.tab(name)
+function builder.pane_tab(name, label)
   local tab = {
     ---@type RSAD.GuiBuilder
     tab = {
@@ -260,11 +398,99 @@ function builder.tab(name)
       args = {
         type = "tab",
         name = name,
-        caption = {"", "test"}
+        caption = label
       }
     }
   }
   local self = builder.make(tab)
+  return self
+end
+
+---Creates a listbox 
+---@param name string?
+---@param items LocalisedString[]?
+---@param selected uint32?
+---@param style string?
+---@param stylemods StyleMods?
+---@return RSAD.GuiBuilder
+function builder.list(name, items, selected, style, stylemods)
+  ---@type RSAD.GuiBuilder
+  local def = {
+    --[[@type LuaGuiElement.add_param.list_box]]
+    args = {
+      type = "list-box",
+      name = name,
+      style = style,
+      items = items,
+      selected_index = selected
+    },
+    style_mods = stylemods
+  }
+  local self = builder.make(def)
+  return self
+end
+
+---Creates a dropdown selector
+---@param name string?
+---@param items LocalisedString[]?
+---@param selected uint32?
+---@param style string?
+---@return RSAD.GuiBuilder
+function builder.dropdown(name, items, selected, style)
+  ---@type RSAD.GuiBuilder
+  local def = {
+    --[[@type LuaGuiElement.add_param.drop_down]]
+    args = {
+      type = "drop-down",
+      name = name,
+      style = style,
+      items = items,
+      selected_index = selected
+    }
+  }
+  local self = builder.make(def)
+  return self
+end
+
+---Creates a minimap view
+---@param name string?
+---@param style string?
+---@param stylemods StyleMods?
+---@return RSAD.GuiBuilder
+function builder.minimap(name, style, stylemods)
+  ---@type RSAD.GuiBuilder
+  local def = {
+    --[[@type LuaGuiElement.add_param.minimap]]
+    args = {
+      type = "minimap",
+      name = name,
+      style = style,
+    },
+    style_mods = stylemods
+  }
+  local self = builder.make(def)
+  return self
+end
+
+---Creates a sprite
+---@param path SpritePath
+---@param name string?
+---@param style string?
+---@param stylemods StyleMods?
+---@return RSAD.GuiBuilder
+function builder.sprite(path, name, style, stylemods)
+  ---@type RSAD.GuiBuilder
+  local def = {
+    --[[@type LuaGuiElement.add_param.sprite]]
+    args = {
+      type = "sprite",
+      name = name,
+      style = style,
+      sprite = path
+    },
+    style_mods = stylemods
+  }
+  local self = builder.make(def)
   return self
 end
 
@@ -305,7 +531,8 @@ function builder.make_window(namespace, min_size)
       horizontally_stretchable = true,
     }
   }
-  window.handlers = { builder.default_handlers.window_close }
+  window.handlers = {}
+  window.handlers[(namespace .. "._closed")] = builder.default_handlers.window_close
   local self = builder.make(window)
   return self --[[@as RSAD.GuiBuilder]]
 end
@@ -343,12 +570,25 @@ function builder:with_construction(name, constructor)
   return self
 end
 
+---Adds fields to an element builder
+---@param events table<string, GuiEventHandler>
+function builder:with_events(events)
+  local self_name = (self.args and self.args.name) or (self.tab and self.tab.args and self.tab.args.name)
+  self.handlers = self.handlers or {}
+  for key, value in pairs(events) do
+    self[key] = value
+    self.handlers[(self_name .. "." .. key)] = value
+  end
+  return self
+end
+
 ---@class RSAD.GuiBuilderMeta.Index
 ---@field center fun(self:RSAD.GuiBuilder)
 ---@field with_construction fun(self:RSAD.GuiBuilder, name:string, constructor:fun(self:LuaGuiElement, ...))
 builder_meta.__index = {
   center = builder.center,
   with_construction = builder.with_construction,
+  with_events = builder.with_events,
 }
 --
 
