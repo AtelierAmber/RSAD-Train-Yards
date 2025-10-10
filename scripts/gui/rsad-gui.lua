@@ -26,7 +26,7 @@ local function click_mod_button(event)
     local testf, testr = glib.add(refs["train_views"], train_view)
 
     --Procedures
-    local node = procedure_builder.build_node("test1")
+    local node = procedure_builder.build_node("test1", builder.label("Test"), builder.checkbox("check", true))
     local testf, testr = glib.add(refs["procedure_nodes"], node)
     local testf, testr = glib.add(refs["procedure_nodes"], procedure_builder.arrow)
   end
@@ -44,7 +44,7 @@ glib.register_handlers(mod_button.handlers, nil, rsad.controller.gui.names.mod_b
 glib.register_handlers(controller_gui.handlers, nil, rsad.controller.gui.names.namespace)
 glib.register_handlers(train_view.handlers, nil, "rsad_train_view")
 glib.register_handlers(procedure_builder.arrow.handlers, nil, "rsad_procedure_arrows")
-glib.register_handlers(node_handlers.handlers, nil, "rsad_procedure_node")
+glib.register_handlers(node_handlers, nil, "rsad_procedure_node")
 
 local gui_handlers = {
   wrapper,

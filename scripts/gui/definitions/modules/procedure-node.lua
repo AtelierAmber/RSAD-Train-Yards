@@ -9,7 +9,8 @@ local next_node_arrow = builder.frame(nil, "invisible_frame", nil,
 
 local procedure_builder = {arrow = next_node_arrow}
 
-function procedure_builder.build_node(name, content)
+
+function procedure_builder.build_node(name, ...)
   local procedure_node = builder.frame(nil, "invisible_frame", nil, {horizontally_stretchable = false, vertically_stretchable = false, use_header_filler = false, padding = 0}){
     builder.frame("node_frame", "train_schedule_partially_fullfilled_condition_frame", true, {size = {260, 260}, padding = 3}){
       builder.vflow(nil, nil, {vertical_spacing = 0}){
@@ -19,8 +20,8 @@ function procedure_builder.build_node(name, content)
           builder.button("delete_node_button", handlers.delete_node, "tool_button_red", nil, nil, "utility.trash")
         },
         builder.vscroll(nil, "always", "scroll_pane_in_shallow_frame", {padding = 0}){
-          builder.frame(nil, "blueprint_parameter_frame", true, {margin = -4, horizontally_stretchable = true, vertically_stretchable = true}){
-            content
+          builder.frame(nil, "blueprint_parameter_frame", true, {margin = -4, horizontally_stretchable = true, vertically_stretchable = true})({...}){
+            builder.spacer(true, true, nil, "entity_frame_filler", {margin = -8})
           }
         }
       }

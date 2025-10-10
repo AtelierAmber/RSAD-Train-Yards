@@ -15,7 +15,7 @@ local builder_meta = {
     if not self.tab then
       for _, child in pairs(...) do
         assert(type(child) == "table" and (child.args or child.tab), "Failed to create gui. Child, \"" ..
-          serpent.line(child) .. "\" is not of type table.")
+          serpent.line(child) .. "\" is not of type table. It is " .. tostring(type(child)))
         if child.tab then assert(self.args.type == "tabbed-pane", "Parent of tabs must be a tabbed-pane!") end
         table.insert(self.children, child)
         child.parent = self
