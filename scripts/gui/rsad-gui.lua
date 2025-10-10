@@ -22,8 +22,8 @@ local function click_mod_button(event)
   else
     frame, refs = glib.add(player.gui.screen, controller_gui)
     --Trains
-    local testf, testr = glib.add(refs["train_views"], train_view)
-    local testf, testr = glib.add(refs["train_views"], train_view)
+    local testf, testr = glib.add(refs["rsad_overview_train_views"], train_view)
+    local testf, testr = glib.add(refs["rsad_overview_train_views"], train_view)
 
     --Procedures
     local node = procedure_builder.build_node("test1", builder.label("Test"), builder.checkbox("check", true))

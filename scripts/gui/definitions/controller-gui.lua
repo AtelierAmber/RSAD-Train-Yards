@@ -32,10 +32,10 @@ builder.frame(localised_names.namespace, "frame", true)
         require("scripts.gui.definitions.overview-gui")
       },
       builder.pane_tab("logistics_tab", {localised_names.logistics_tab_title}){
-        builder.frame("testtabframe2")
+        require("scripts.gui.definitions.logistics-gui")
       },
       builder.pane_tab("routine_tab", {localised_names.routine_tab_title}){
-        builder.frame("testtabframe3")
+        require("scripts.gui.definitions.routines-gui")
       },
       builder.pane_tab("procedure_tab", {localised_names.procedure_tab_title}){
         require("scripts.gui.definitions.procedures-gui")
