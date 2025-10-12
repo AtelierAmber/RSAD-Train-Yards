@@ -1,9 +1,9 @@
----@alias RSAD.GuiBuilder.Constructor fun(self:LuaGuiElement, ...)
+---@alias RSAD.GuiBuilder.Constructor fun(self:LuaGuiElement, event:EventData, ...)
 
 ---@class RSAD.GuiBuilder : GuiElemDef
 ---@field handlers? GuiEventHandler[]
 ---@field center? fun(self:RSAD.GuiBuilder):RSAD.GuiBuilder
----@field with_construction? fun(self:RSAD.GuiBuilder, name:string, constructor:RSAD.GuiBuilder.Constructor):RSAD.GuiBuilder
+---@field with_class? fun(self:RSAD.GuiBuilder, name:string, class_funcs:table<string, fun(...):any>):RSAD.GuiBuilder
 local builder = {}
 local builder_meta = {
   ---Use {} from a return function of builder to initialize children
@@ -80,6 +80,8 @@ local builder_meta = {
 ---@param stylemods StyleMods?
 ---@param emods ElemMods?
 function builder.frame(name, style, vertical, stylemods, emods)
+  local emod_tags = emods and emods.tags
+  if emod_tags then emods.tags = nil end
   ---@type RSAD.GuiBuilder
   local frame = {
     --[[@type LuaGuiElement.add_param.frame]]
@@ -88,6 +90,7 @@ function builder.frame(name, style, vertical, stylemods, emods)
       name = name,
       style = style,
       direction = ((vertical ~= nil) and ((vertical and "vertical") or "horizontal")) or nil,
+      tags = emod_tags,
     },
     style_mods = stylemods,
     elem_mods = emods
@@ -106,6 +109,8 @@ end
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
 function builder.table(column_count, name, style, draw_vertical_lines, draw_horizontal_lines, stylemods, emods)
+  local emod_tags = emods and emods.tags
+  if emod_tags then emods.tags = nil end
   ---@type RSAD.GuiBuilder
   local frame = {
     --[[@type LuaGuiElement.add_param.table]]
@@ -116,6 +121,7 @@ function builder.table(column_count, name, style, draw_vertical_lines, draw_hori
       column_count = column_count,
       draw_vertical_lines = draw_vertical_lines,
       draw_horizontal_lines = draw_horizontal_lines,
+      tags = emod_tags,
     },
     style_mods = stylemods,
     elem_mods = emods
@@ -246,6 +252,8 @@ end
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
 function builder.spacer(v, h, name, style, stylemods, emods)
+  local emod_tags = emods and emods.tags
+  if emod_tags then emods.tags = nil end
   ---@type RSAD.GuiBuilder
   local spacer = {
     --[[@type LuaGuiElement.add_param.base]]
@@ -253,6 +261,7 @@ function builder.spacer(v, h, name, style, stylemods, emods)
       type = "empty-widget",
       name = name,
       style = style,
+      tags = emod_tags
     },
     style_mods = stylemods or {},
     elem_mods = emods
@@ -270,6 +279,8 @@ end
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
 function builder.dragger(name, target, stylemods, emods)
+  local emod_tags = emods and emods.tags
+  if emod_tags then emods.tags = nil end
   ---@type RSAD.GuiBuilder
   local spacer = {
     --[[@type LuaGuiElement.add_param.base]]
@@ -277,6 +288,7 @@ function builder.dragger(name, target, stylemods, emods)
       type = "empty-widget",
       name = name,
       style = "draggable_space",
+      tags = emod_tags,
     },
     style_mods = stylemods or {},
     elem_mods = emods,
@@ -295,6 +307,8 @@ end
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
 function builder.label(caption, name, style, stylemods, emods)
+  local emod_tags = emods and emods.tags
+  if emod_tags then emods.tags = nil end
   ---@type RSAD.GuiBuilder
   local label = {
     --[[@type LuaGuiElement.add_param.base]]
@@ -303,6 +317,7 @@ function builder.label(caption, name, style, stylemods, emods)
       name = name,
       style = style or "label",
       caption = caption,
+      tags = emod_tags,
     },
     style_mods = stylemods,
     elem_mods = emods,
@@ -322,6 +337,8 @@ end
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
 function builder.button(name, handler, style, caption, tooltip, sprite, stylemods, emods)
+  local emod_tags = emods and emods.tags
+  if emod_tags then emods.tags = nil end
   ---@type RSAD.GuiBuilder
   local button = {
     --[[@type LuaGuiElement.add_param.button]]
@@ -332,7 +349,8 @@ function builder.button(name, handler, style, caption, tooltip, sprite, stylemod
       caption = caption,
       tooltip = tooltip,
       style = style,
-      sprite = sprite
+      sprite = sprite,
+      tags = emod_tags
     },
     style_mods = stylemods,
     elem_mods = emods,
@@ -370,8 +388,9 @@ end
 ---@param name string?
 ---@param style string?
 ---@param stylemods StyleMods?
+---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.tabbed_pane(name, style, stylemods)
+function builder.tabbed_pane(name, style, stylemods, emods)
   ---@type RSAD.GuiBuilder
   local pane = {
     --[[@type LuaGuiElement.add_param]]
@@ -380,7 +399,8 @@ function builder.tabbed_pane(name, style, stylemods)
       name = name,
       style = style,
     },
-    style_mods = stylemods
+    style_mods = stylemods,
+    elem_mods = emods
   }
   local self = builder.make(pane)
   return self
@@ -390,7 +410,8 @@ end
 ---@param name string
 ---@param label LocalisedString?
 ---@return RSAD.GuiBuilder
-function builder.pane_tab(name, label)
+---@param stylemods StyleMods?
+function builder.pane_tab(name, label, stylemods, emods)
   local tab = {
     ---@type RSAD.GuiBuilder
     tab = {
@@ -400,7 +421,9 @@ function builder.pane_tab(name, label)
         name = name,
         caption = label
       }
-    }
+    },
+    style_mods = stylemods,
+    elem_mods = emods
   }
   local self = builder.make(tab)
   return self
@@ -494,6 +517,41 @@ function builder.sprite(path, name, style, stylemods)
   return self
 end
 
+---Creates a text field
+---@param name string?
+---@param initial string?
+---@param numeric boolean?
+---@param decimal boolean?
+---@param negative boolean?
+---@param password boolean?
+---@param lose_focus boolean?
+---@param icon boolean?
+---@param style string?
+---@param stylemods StyleMods?
+---@param emods ElemMods?
+---@return RSAD.GuiBuilder
+function builder.text_field(name, initial, numeric, decimal, negative, password, lose_focus, icon, style, stylemods, emods)
+  ---@type RSAD.GuiBuilder
+  local def = {
+    --[[@type LuaGuiElement.add_param.textfield]]
+    args = {
+      type = "textfield",
+      name = name,
+      style = style,
+      text = initial,
+      numeric = numeric,
+      allow_decimal = decimal,
+      allow_negative = negative,
+      is_password = password,
+      lose_focus_on_confirm = lose_focus,
+      icon_selector = icon,
+    },
+    style_mods = stylemods
+  }
+  local self = builder.make(def)
+  return self
+end
+
 ---Allows for a custom GUI element definition to be added
 ---@param definition GuiElemDef
 ---@return RSAD.GuiBuilder
@@ -554,18 +612,16 @@ end
 ---Registers a constructor that can be called after add
 ---@param self RSAD.GuiBuilder
 ---@param name string
----@param constructor RSAD.GuiBuilder.Constructor
+---@param class_funcs table<string, fun(...):any>
 ---@return RSAD.GuiBuilder
-function builder:with_construction(name, constructor)
+function builder:with_class(name, class_funcs)
   if self.class then
     error("Trying to register GUIBuilder class to a gui twice!")
     return self
   end
 
-  glib.register_class(name, {construct = function (elem)
-    constructor(elem)
-  end})
-  --self.class = name
+  glib.register_class(name, class_funcs)
+  self.class = name
 
   return self
 end
@@ -587,7 +643,7 @@ end
 ---@field with_construction fun(self:RSAD.GuiBuilder, name:string, constructor:fun(self:LuaGuiElement, ...))
 builder_meta.__index = {
   center = builder.center,
-  with_construction = builder.with_construction,
+  with_class = builder.with_class,
   with_events = builder.with_events,
 }
 --

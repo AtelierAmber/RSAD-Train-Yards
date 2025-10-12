@@ -1,22 +1,4 @@
----@enum rsad_station_type
-rsad_station_type = {
-  turnabout = 0 --[[@as rsad_station_type.turnabout ]],             --
-  shunting_depot = 1 --[[@as rsad_station_type.shunting_depot ]],   --
-  import_staging = 2 --[[@as rsad_station_type.import_staging ]],   --
-  import = 3 --[[@as rsad_station_type.import ]],                   --
-  request = 4 --[[@as rsad_station_type.request ]],                 --
-  empty_staging = 5 --[[@as rsad_station_type.empty_staging ]],     --
-  empty_pickup = 6 --[[@as rsad_station_type.empty_pickup ]],       --
-}
 
-rsad_station_name = {}
-rsad_station_name[rsad_station_type.turnabout] = "Turnabout"
-rsad_station_name[rsad_station_type.shunting_depot] = "Shunting Depot"
-rsad_station_name[rsad_station_type.import_staging] = "Multi-Item Import Staging"
-rsad_station_name[rsad_station_type.import] = "Single-Item Import Queue"
-rsad_station_name[rsad_station_type.request] = "Requester"
-rsad_station_name[rsad_station_type.empty_staging] = "Empty Wagon Staging"
-rsad_station_name[rsad_station_type.empty_pickup] = "Empty Wagon Pickup"
 
 ---@enum rsad_shunting_stage
 rsad_shunting_stage = {

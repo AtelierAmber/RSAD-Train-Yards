@@ -1,16 +1,9 @@
-require("scripts.rsad.train-yard")
-require("scripts.rsad.station")
-scheduler = require("scripts.rsad.scheduler")
-require("scripts.util.events")
 ---@type flib_math
-math = require("__flib__.math")
+local math = require("__flib__.math")
 
 local ticks_per_update = math.floor(360 / settings.startup["rsad-station-update-rate"].value) + 1
 local max_train_limit = settings.startup["rsad-station-max-train-limit"].value --[[@as integer]]
 local max_cargo_limit = settings.startup["rsad-station-max-cargo-limit"].value --[[@as integer]]
-
----@type string?
-active_yard = nil
 
 --#region Function Localization for indexing speed
 
@@ -19,72 +12,82 @@ local pairs = pairs
 
 --#endregion
 
-rsad.controller.train_yards = {
-  {name = "Yard A"},
-  {name = "Yard B"},
-  {name = "Yard C"},
-  {name = "Yard D"},
-  {name = "Yard E"},
-}
-
-if true then
-  return -- Skip remaining for testing
-end
-
----@class RSAD.Controller
-rsad_controller = {
-  stations = nil, --[[@type table<uint, RSAD.Station>]]
-  train_yards = nil, --[[@type table<string, RSAD.TrainYard>]]
+---@class RSAD
+---@field public stops table<uint, RSAD.Station>
+---@field public yards table<string, RSAD.TrainYard>
+---@field public scheduler RSAD.Scheduler
+rsad = {
+  stops = nil, --[[@type table<uint, RSAD.Station>]]
+  yards = nil, --[[@type table<string, RSAD.TrainYard>]]
   scheduler = scheduler, --[[@type RSAD.Scheduler]]
   shunter_networks = {}, --[[@type table<integer, string>]]           -- Train ID to TrainYard network hash
-  station_assignments = {} --[[@type table<integer, RSAD.Station>]]   -- Train ID to station it is parked at
+  station_assignments = {}, --[[@type table<integer, RSAD.Station>]]   -- Train ID to station it is parked at
+  
+  events = {}, --[[@type table<defines.events, fun(event:EventData)>]]
 }
-rsad_controller.scheduler.controller = rsad_controller
 
----@package
----@param self RSAD.Controller
-function rsad_controller.__init(self)
-  if not storage.stations then storage.stations = {} end
-  self.stations = storage.stations
-  for _, station in pairs(self.stations) do
-    if station.parked_train then
-      self.station_assignments[station.parked_train] = station
-    end
-  end
-  if not storage.train_yards then storage.train_yards = {} end
-  self.train_yards = storage.train_yards or {}
-  for network, yard in pairs(storage.train_yards) do
-    for id, info in pairs(yard.shunter_trains) do
-      self.shunter_networks[id] = network
-    end
-  end
-  storage.needs_tick = storage.needs_tick or false
-  if not storage.scripted_trains then storage.scripted_trains = {} end
-  self.scheduler.scripted_trains = storage.scripted_trains or {}
+--rsad_controller.scheduler.controller = rsad_controller
+
+function rsad.on_init()
+  if not storage.stops then storage.stops = {} end
+  if not storage.yards then storage.yards = {} end
+
+  rsad:setup()
 end
 
----@package
----@param self RSAD.Controller
-function rsad_controller.__load(self)
-  self.stations = storage.stations or {}
-  for _, station in pairs(self.stations) do
-    if station.parked_train then
-      self.station_assignments[station.parked_train] = station
+function rsad.on_configuration_changed()
+  rsad.on_init()
+end
+
+function rsad.on_load()
+  rsad:setup()
+end
+
+function rsad.setup(self)
+  self.stops = storage.stops
+  self.yards = storage.yards
+  --storage.needs_tick = storage.needs_tick or false
+
+  if not self.stops or not self.yards then return end
+
+  for _, stop in pairs(self.stops) do
+    if stop.parked_train then
+      -- self.station_assignments[stop.parked_train] = stop
     end
   end
-  self.train_yards = storage.train_yards or {}
-  self.scheduler.scripted_trains = storage.scripted_trains or {}
-  for network, yard in pairs(storage.train_yards) do
+
+  for network, yard in pairs(storage.yards) do
     for id, info in pairs(yard.shunter_trains) do
-      self.shunter_networks[id] = network
+      -- self.shunter_networks[id] = network
     end
   end
 end
 
+---Creates a blank train yard and adds it to the registerd yards
+---@param self RSAD
+---@param name string
+---@return RSAD.TrainYard?
+function rsad.create_train_yard(self, name)
+  if self.yards[name] then
+    return nil
+  end
+  self.yards[name] = {
+    name = name,
+    stops = {},
+    governed_trains = {},
+  }
+
+  return self.yards[name]
+end
+
+if true then
+  return
+end
+
 ---@package
----@param self RSAD.Controller
+---@param self RSAD
 ---@param tick_data NthTickEventData
-function rsad_controller.__nth_tick(self, tick_data)
+function rsad.__nth_tick(self, tick_data)
   --- Check first if any shunting orders need to be issued
   if self.scheduler:update() then end
 
@@ -108,7 +111,7 @@ end
 ---@param self RSAD.Controller
 ---@param train LuaTrain
 ---@param old_state defines.train_state
-function rsad_controller.__on_train_state_change(self, train, old_state)
+function rsad.__on_train_state_change(self, train, old_state)
   if train.state == defines.train_state.wait_station then
     local station = (train.station and self.stations[train.station.unit_number]) or self.station_assignments[train.id]
     if not station then

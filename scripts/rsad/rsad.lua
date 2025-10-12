@@ -1,5 +1,5 @@
+---@class RSAD
 rsad = {}
-rsad.controller = {}
 
 require("scripts.rsad.rsad-controller")
 

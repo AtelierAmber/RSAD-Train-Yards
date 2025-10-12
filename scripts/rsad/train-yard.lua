@@ -3,32 +3,6 @@ require("scripts.rsad.station")
 
 local next = next -- Assign local table next for indexing speed
 
----@class RSAD.TrainYard.ShuntingData
----@field public current_stage rsad_shunting_stage
----@field public pickup_info uint
----@field public scheduled_stations table<uint, RSAD.Station> -- Stations this shunter is visiting. Maps schedule.current to station
-
----@see create_train_yard
----@class RSAD.TrainYard
----@field public network SignalID
----@field public rsad_station_type.shunting_depot {[uint]: RSAD.Station}
----@field public rsad_station_type.turnabout {[rsad_shunting_stage]: RSAD.Station}
----@field public rsad_station_type.import_staging {[uint]: RSAD.Station}
----@field public rsad_station_type.import {[string]: {[uint]: RSAD.Station}} -- Maps item to RSADStations
----@field public rsad_station_type.request {[uint]: string} --- Maps RSADStation to their item request
----@field public rsad_station_type.empty_staging {[uint]: RSAD.Station}
----@field public rsad_station_type.empty_pickup {[uint]: RSAD.Station}
----@field public shunter_trains {[uint]: RSAD.TrainYard.ShuntingData}
----Functions
----@field public add_or_update_station fun(self: self, station: RSAD.Station): boolean --- Adds the station to the relevant array. Returns success
----@field public remove_station fun(self: self, unit_number: number) --- Removes the station from yard
----@field public is_empty fun(self: self): boolean --- Returns true if no stations exist in this yard
----@field public decommision fun(self: self) --- Returns true if no stations exist in this yard
----@field public add_new_shunter fun(self:self, train_id: integer)
----@field public remove_shunter fun(self:self, train_id: integer)
----@field public redefine_shunter fun(self:self, old_id: integer, new_id: integer)
----@field public update fun(self: self, controller: RSAD.Controller)
-
 --- TODO: Make custom schedules possible
 
 --- Removes the station if it exists from all registers
@@ -247,3 +221,34 @@ function create_train_yard(network)
   storage.train_yards[hash] = yard
   return yard
 end
+
+---@class RSAD.TrainYard.TrainInfo
+---@field public current_stage rsad_shunting_stage
+---@field public pickup_info uint
+---@field public scheduled_stations table<uint, RSAD.Station> -- Stations this shunter is visiting. Maps schedule.current to station
+
+---@see create_train_yard
+---@class RSAD.TrainYard
+---@field public name string
+---@field public stops table<uint, RSAD.Stop> -- map of 
+---@field public governed_trains table<uint, RSAD.TrainYard.TrainInfo>
+
+---OLD
+---@field public network SignalID
+---@field public rsad_station_type.shunting_depot {[uint]: RSAD.Station}
+---@field public rsad_station_type.turnabout {[rsad_shunting_stage]: RSAD.Station}
+---@field public rsad_station_type.import_staging {[uint]: RSAD.Station}
+---@field public rsad_station_type.import {[string]: {[uint]: RSAD.Station}} -- Maps item to RSADStations
+---@field public rsad_station_type.request {[uint]: string} --- Maps RSADStation to their item request
+---@field public rsad_station_type.empty_staging {[uint]: RSAD.Station}
+---@field public rsad_station_type.empty_pickup {[uint]: RSAD.Station}
+---@field public shunter_trains {[uint]: RSAD.TrainYard.ShuntingData}
+---Functions
+---@field public add_or_update_station fun(self: self, station: RSAD.Station): boolean --- Adds the station to the relevant array. Returns success
+---@field public remove_station fun(self: self, unit_number: number) --- Removes the station from yard
+---@field public is_empty fun(self: self): boolean --- Returns true if no stations exist in this yard
+---@field public decommision fun(self: self) --- Returns true if no stations exist in this yard
+---@field public add_new_shunter fun(self:self, train_id: integer)
+---@field public remove_shunter fun(self:self, train_id: integer)
+---@field public redefine_shunter fun(self:self, old_id: integer, new_id: integer)
+---@field public update fun(self: self, controller: RSAD.Controller)

@@ -1,8 +1,9 @@
 ---@class (exact) __RSAD_STORAGE
 ---@field public needs_tick boolean Enabled when rsad needs every tick monitored (scripted trains and such)
 ---@field public scripted_trains table<uint, ScriptedTrainDestination>
----@field public stations table<uint, RSAD.Station>
----@field public train_yards table<string, RSAD.TrainYard>
+---@field public stops table<uint, RSAD.Station>
+---@field public yards table<string, RSAD.TrainYard>
+---@field public gui_states table<uint, RSAD.Gui.PlayerState>
 storage = {}
 
 require("definitions")
@@ -10,9 +11,7 @@ require("definitions")
 local handler = require("__core__.lualib.event_handler")
 
 -- Core
-handler.add_libraries({
-  require("scripts.rsad")
-})
+handler.add_libraries({require("scripts.rsad.rsad")})
 
 -- GUI
 handler.add_libraries(require("scripts.gui.rsad-gui"))
