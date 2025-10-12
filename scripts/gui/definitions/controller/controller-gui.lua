@@ -56,6 +56,9 @@ local function rsad_gui_update(self, player_state)
       if overview_yard_list then
         overview_yard_list.items = yard_names
         overview_yard_list.selected_index = selected_yard_i
+        for _, item in pairs(overview_yard_list.children) do
+          glib.add(item, builder.button("delete_item_button", handlers.delete_item, "tool_button_red", nil, nil, "utility.trash"))
+        end
       end
       if logistics_yard_list then
         logistics_yard_list.items = yard_names

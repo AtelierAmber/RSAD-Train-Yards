@@ -3,19 +3,19 @@ local builder = require("scripts.gui.lib.gui-builder") --[[@as RSAD.GuiBuilder]]
 
 local handlers = require("scripts.gui.handlers.procedures-handlers")
 
-rsad.gui.procedures_tab = {}
-rsad.gui.procedures_tab.names = {
+rsad.gui.routines_tab = {}
+rsad.gui.routines_tab.names = {
   routine_list_label = "rsad-controller-gui.procedures-list",
   routine_create = "rsad-controller-gui.procedure-create",
 }
-rsad.gui.procedures_tab.state = {
+rsad.gui.routines_tab.state = {
   selected_routine = 1
 }
 
-local localised_names = rsad.gui.procedures_tab.names
-local state = rsad.gui.procedures_tab.state
+local localised_names = rsad.gui.routines_tab.names
+local state = rsad.gui.routines_tab.state
 
-local procedures_tab = builder.hflow("rsad_routines_tab", "inset_frame_container_horizontal_flow_in_tabbed_pane", {height = 700, maximal_height = 700}){
+local routines_tab = builder.hflow("rsad_routines_tab", "inset_frame_container_horizontal_flow_in_tabbed_pane", {height = 700, maximal_height = 700}){
   builder.frame(nil, "deep_frame_in_shallow_frame", true, {width = 300}){ 
     builder.frame(nil, "slot_window_frame"){ 
       builder.hflow(nil, nil, {vertical_align = "center"}){
@@ -31,4 +31,4 @@ local procedures_tab = builder.hflow("rsad_routines_tab", "inset_frame_container
   }
 }
 
-return procedures_tab
+return routines_tab
