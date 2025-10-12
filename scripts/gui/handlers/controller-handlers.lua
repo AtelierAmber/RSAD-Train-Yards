@@ -1,4 +1,4 @@
-local create_yard_dialog = require("scripts.gui.definitions.dialogs.create_yard_dialog")
+local create_yard_dialog = require("scripts.gui.definitions.dialogs.create-yard-dialog")
 glib.register_handlers(create_yard_dialog.handlers)
 
 local handlers = {}
