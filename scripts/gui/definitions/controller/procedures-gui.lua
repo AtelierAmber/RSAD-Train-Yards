@@ -17,7 +17,7 @@ local procedures_tab = builder.hflow("rsad_procedures_tab", "inset_frame_contain
       builder.hflow(nil, nil, {vertical_align = "center"}){
         builder.label({"rsad-controller-gui.procedures-list"}, nil, "heading_2_label"),
         builder.spacer(false, true),
-        builder.button("create_procedure", nil, "map_view_add_button", {"rsad-controller-gui.create"}),
+        builder.button("create_procedure", handlers.open_create_procedure, "map_view_add_button", {"rsad-controller-gui.create"}),
       }
     },
     builder.list(ref_names.procedures_list, nil, 0, "rsad_list_box"),

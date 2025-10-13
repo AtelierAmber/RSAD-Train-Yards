@@ -16,7 +16,7 @@ local dialog = builder.frame(ref_names.main, nil, true, {minimal_height = 200, m
   builder.hflow(){ -- Title
     builder.label({"rsad-controller-gui.dialog.create-procedure"}, nil, "frame_title"),
     builder.dragger("title.drag", ref_names.main, {minimal_height = 24}),
-    builder.button("title.close", handlers.cancel_dialog, "close_button", nil, nil, "utility/close", nil, {tags = {dialog_close_target = "rsad-controller-gui.dialog.create-yard",}})
+    builder.button("title.close", handlers.cancel_dialog, "close_button", nil, nil, "utility/close", nil, {tags = {dialog_close_target = ref_names.main,}})
   },
   builder.frame("params_frame", nil, true, {horizontally_stretchable = true, vertically_stretchable = true}){
     builder.hflow("params_flow"){
@@ -27,9 +27,9 @@ local dialog = builder.frame(ref_names.main, nil, true, {minimal_height = 200, m
     }
   },
   builder.hflow(){
-    builder.button("cancel-create-yard", handlers.cancel_dialog, "red_back_button", {"rsad-controller-gui.dialog.cancel"}, {"", "TODO"}, nil, nil, {tags = {dialog_close_target = ref_names.main,}}),
+    builder.button("cancel-create-procedure", handlers.cancel_dialog, "red_back_button", {"rsad-controller-gui.dialog.cancel"}, {"", "TODO"}, nil, nil, {tags = {dialog_close_target = ref_names.main,}}),
     builder.spacer(false, true),
-    builder.button("confirm-create-yard", handlers.confirm_create_procedure_dialog, "confirm_button", {"rsad-controller-gui.dialog.create-procedure"}, {"", "TODO"}, nil, nil, {tags = {dialog_close_target = ref_names.main,}})
+    builder.button("confirm-create-procedure", handlers.confirm_create_procedure_dialog, "confirm_button", {"rsad-controller-gui.dialog.create-procedure"}, {"", "TODO"}, nil, nil, {tags = {dialog_close_target = ref_names.main,}})
   }
 }
 

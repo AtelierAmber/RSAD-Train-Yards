@@ -50,9 +50,8 @@ end
 local mod_button = builder.button(rsad.gui.ref_names.mod_button, click_mod_button, nil, { "rsad-controller-gui.mod-gui-button" })
 wrapper.new_mod_gui(mod_button)
 
-glib.register_handlers(mod_button.handlers, nil, rsad.gui.ref_names.mod_button)
-glib.register_handlers(controller_gui.handlers, nil, rsad.gui.ref_names.main)
-glib.register_handlers(train_view.handlers, nil, "rsad_train_view")
+--glib.register_handlers(mod_button.handlers, nil, rsad.gui.ref_names.mod_button)
+--glib.register_handlers(controller_gui.handlers, nil, rsad.gui.ref_names.main)
 
 local function setup_gui_refs(self)
   rsad.gui.states = storage.gui_states
@@ -75,7 +74,7 @@ function gui_game_events.on_load()
   setup_gui_refs()
 end
 
-
+glib.register_handlers(g_builder_handlers, nil, rsad.gui.ref_names.main)
 local gui_handlers = {
   wrapper,
   glib,

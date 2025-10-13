@@ -1,7 +1,9 @@
 ---@alias RSAD.GuiBuilder.Constructor fun(self:LuaGuiElement, event:EventData, ...)
 
+g_builder_func_names = g_builder_func_names or {} --[[@type table<fun(event: GuiEventData), string>]]
+g_builder_handlers = g_builder_handlers or {} --[[@type table<string, fun(event: GuiEventData)>]]
+
 ---@class RSAD.GuiBuilder : GuiElemDef
----@field handlers? GuiEventHandler[]
 ---@field center? fun(self:RSAD.GuiBuilder):RSAD.GuiBuilder
 ---@field with_class? fun(self:RSAD.GuiBuilder, name:string, class_funcs:table<string, fun(...):any>):RSAD.GuiBuilder
 local builder = {}
@@ -11,7 +13,6 @@ local builder_meta = {
   ---@return RSAD.GuiBuilder
   __call = function(self, ...)
     self.children = self.children or {}
-    self.handlers = self.handlers or {}
     if not self.tab then
       for _, child in pairs(...) do
         assert(type(child) == "table" and (child.args or child.tab), "Failed to create gui. Child, \"" ..
@@ -19,25 +20,6 @@ local builder_meta = {
         if child.tab then assert(self.args.type == "tabbed-pane", "Parent of tabs must be a tabbed-pane!") end
         table.insert(self.children, child)
         child.parent = self
-        if child.handlers then
-          for hname, handler in pairs(child.handlers) do
-            local found = false
-            for exname, existing in pairs(self.handlers) do
-              if existing == handler then
-                found = true
-              end
-              if exname == hname then
-                error("Failed to make handler " .. hname .. " since it already exists in this element!")
-              end
-            end
-            if not found then
-              self.handlers[hname] = handler
-            else
-              self.handlers[hname] = function(evnt) handler(evnt) end
-            end
-          end
-          child.handlers = nil
-        end
       end
     else
       if #... > 1 then
@@ -48,25 +30,6 @@ local builder_meta = {
       assert(type(child) == "table" and (child.args or child.tab), "Failed to create gui. Child, \"" ..
         serpent.line(child) .. "\" is not of type table.")
       child.parent = self
-      if child.handlers then
-        for hname, handler in pairs(child.handlers) do
-          local found = false
-          for exname, existing in pairs(self.handlers) do
-            if existing == handler then
-              found = true
-            end
-            if exname == hname then
-              error("Failed to make handler " .. hname .. " since it already exists in this element!")
-            end
-          end
-          if not found then
-            self.handlers[hname] = handler
-          else
-            self.handlers[hname] = function(evnt) handler(evnt) end
-          end
-        end
-        child.handlers = nil
-      end
       self.content = child
     end
     return self
@@ -328,7 +291,7 @@ end
 
 ---Creates a button
 ---@param name string
----@param handler GuiEventHandler
+---@param click fun(event: GuiEventData)
 ---@param style string?
 ---@param caption LocalisedString?
 ---@param tooltip LocalisedString?
@@ -336,7 +299,7 @@ end
 ---@param stylemods StyleMods?
 ---@param emods ElemMods?
 ---@return RSAD.GuiBuilder
-function builder.button(name, handler, style, caption, tooltip, sprite, stylemods, emods)
+function builder.button(name, click, style, caption, tooltip, sprite, stylemods, emods)
   local emod_tags = emods and emods.tags
   if emod_tags then emods.tags = nil end
   ---@type RSAD.GuiBuilder
@@ -354,10 +317,20 @@ function builder.button(name, handler, style, caption, tooltip, sprite, stylemod
     },
     style_mods = stylemods,
     elem_mods = emods,
-    _click = handler
+    _click = click
   }
-  button.handlers = {}
-  button.handlers[(name .. "._click")] = handler
+  
+  if click then
+    local ename = g_builder_func_names[click]
+    if not ename then
+      ename = (name or "button") .. ".handler._click"
+      if g_builder_handlers[ename] then
+        error("Duplicate name for handler!")
+      end
+      g_builder_func_names[click] = ename
+      g_builder_handlers[ename] = click
+    end
+  end
   local self = builder.make(button)
   return self
 end
@@ -567,34 +540,6 @@ function builder.make(definition)
   return definition --[[@as RSAD.GuiBuilder]]
 end
 
----Returns current context window
----@param namespace string
----@param min_size integer|integer[]?
----@return RSAD.GuiBuilder
-function builder.make_window(namespace, min_size)
-  ---@type RSAD.GuiBuilder
-  local window = {
-    _closed = builder.default_handlers.window_close,
-    --[[@type LuaGuiElement.add_param.frame]]
-    args = {
-      type = "frame",
-      name = namespace,
-      caption = { "", namespace },
-      style = "frame"
-    },
-    style_mods = {
-      minimal_width = (min_size and min_size[1]) or 1,
-      minimal_height = (min_size and min_size[2]) or 1,
-      vertically_stretchable = true,
-      horizontally_stretchable = true,
-    }
-  }
-  window.handlers = {}
-  window.handlers[(namespace .. "._closed")] = builder.default_handlers.window_close
-  local self = builder.make(window)
-  return self --[[@as RSAD.GuiBuilder]]
-end
-
 --MARK: Modifiers
 --- ElemMod accessors
 
@@ -627,13 +572,20 @@ function builder:with_class(name, class_funcs)
 end
 
 ---Adds fields to an element builder
----@param events table<string, GuiEventHandler>
+---@param events table<string, fun(event: GuiEventData)>
 function builder:with_events(events)
   local self_name = (self.args and self.args.name) or (self.tab and self.tab.args and self.tab.args.name)
-  self.handlers = self.handlers or {}
   for key, value in pairs(events) do
     self[key] = value
-    self.handlers[(self_name .. "." .. key)] = value
+    local ename = g_builder_func_names[value]
+    if not ename then
+      ename = self_name .. ".handler." .. key 
+      if g_builder_handlers[ename] then
+        error("Duplicate name for handler!")
+      end
+      g_builder_func_names[value] = ename
+      g_builder_handlers[ename] = value
+    end
   end
   return self
 end
@@ -647,14 +599,5 @@ builder_meta.__index = {
   with_events = builder.with_events,
 }
 --
-
---MARK: Default Handlers
-builder.default_handlers = {}
-
-function builder.default_handlers.window_close(event)
-  event.element.destroy()
-end
-
----
 
 return builder --[[@as RSAD.GuiBuilder]]

@@ -3,10 +3,6 @@ local procedure_builder = require("scripts.gui.definitions.modules.procedure-nod
 local node_handlers = require("scripts.gui.handlers.procedure-node-handlers")
 local create_procedure_dialog = require("scripts.gui.definitions.dialogs.create-procedure-dialog")
 
-glib.register_handlers(procedure_builder.arrow.handlers, nil, "rsad_procedure_arrows")
-glib.register_handlers(node_handlers, nil, "rsad_procedure_node")
-glib.register_handlers(create_procedure_dialog.handlers, nil, "rsad_procedure_create_dialog")
-
 local handlers = {}
 
 ---comment
@@ -16,7 +12,7 @@ function handlers.open_create_procedure(event)
   if not player then error("No player found when opening create procedure dialog!") end
 
   local player_state = rsad.gui.states[event.player_index]
-  local elem, refs = glib.add(event.element.gui.screen, create_yard_dialog)
+  local elem, refs = glib.add(event.element.gui.screen, create_procedure_dialog)
 
   if player_state then
     player_state.open_dialog = elem.name
