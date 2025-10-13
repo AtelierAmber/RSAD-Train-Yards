@@ -1,17 +1,18 @@
-local wrapper = require("scripts.gui.lib.gui-wrapper") --[[@as RSAD.GuiWrapper]]
 local builder = require("scripts.gui.lib.gui-builder") --[[@as RSAD.GuiBuilder]]
-
 
 rsad.gui.procedures_tab = {}
 rsad.gui.procedures_tab.ref_names = {
+  main = "rsad_procedures_tab",
   procedures_list = "rsad_procedures_list",
   procedure_nodes = "procedure_nodes"
 }
 
 local handlers = require("scripts.gui.handlers.procedures-handlers")
+local procedures_class = require("scripts.gui.classes.procedures-class")
 local ref_names = rsad.gui.procedures_tab.ref_names
 
-local procedures_tab = builder.hflow("rsad_procedures_tab", "inset_frame_container_horizontal_flow_in_tabbed_pane", {height = 700, maximal_height = 700, horizontally_stretchable = true}){
+local procedures_tab = builder.hflow(ref_names.main, "inset_frame_container_horizontal_flow_in_tabbed_pane", {height = 700, maximal_height = 700, horizontally_stretchable = true})
+:with_class("procedures_tab_class", procedures_class){
   builder.frame(nil, "deep_frame_in_shallow_frame", true, {width = 300}){ 
     builder.frame(nil, "slot_window_frame"){ 
       builder.hflow(nil, nil, {vertical_align = "center"}){
@@ -20,7 +21,7 @@ local procedures_tab = builder.hflow("rsad_procedures_tab", "inset_frame_contain
         builder.button("create_procedure", handlers.open_create_procedure, "map_view_add_button", {"rsad-controller-gui.create"}),
       }
     },
-    builder.list(ref_names.procedures_list, nil, 0, "rsad_list_box"),
+    builder.list(ref_names.procedures_list, handlers.set_active_procedure, nil, 0, "rsad_list_box"),
   },
   builder.frame(nil, "rsad_array_frame", true){
     builder.hflow(){

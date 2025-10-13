@@ -403,13 +403,14 @@ function builder.pane_tab(name, label, stylemods, emods)
 end
 
 ---Creates a listbox 
----@param name string?
+---@param name string
+---@param stator fun(event: GuiEventData)
 ---@param items LocalisedString[]?
 ---@param selected uint32?
 ---@param style string?
 ---@param stylemods StyleMods?
 ---@return RSAD.GuiBuilder
-function builder.list(name, items, selected, style, stylemods)
+function builder.list(name, stator, items, selected, style, stylemods)
   ---@type RSAD.GuiBuilder
   local def = {
     --[[@type LuaGuiElement.add_param.list_box]]
@@ -420,8 +421,21 @@ function builder.list(name, items, selected, style, stylemods)
       items = items,
       selected_index = selected
     },
-    style_mods = stylemods
+    style_mods = stylemods,
+    _selection_state_changed = stator
   }
+
+  if stator then
+    local ename = g_builder_func_names[stator]
+    if not ename then
+      ename = (name or "list") .. ".handler._selection_state_changed"
+      if g_builder_handlers[ename] then
+        error("Duplicate name for handler!")
+      end
+      g_builder_func_names[stator] = ename
+      g_builder_handlers[ename] = stator
+    end
+  end
   local self = builder.make(def)
   return self
 end
