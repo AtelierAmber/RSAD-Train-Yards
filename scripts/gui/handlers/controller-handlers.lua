@@ -1,5 +1,5 @@
 local create_yard_dialog = require("scripts.gui.definitions.dialogs.create-yard-dialog")
-glib.register_handlers(create_yard_dialog.handlers)
+glib.register_handlers(create_yard_dialog.handlers, nil, "create_yard_dialog")
 
 local handlers = {}
 

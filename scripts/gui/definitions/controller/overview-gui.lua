@@ -17,7 +17,7 @@ local overview_tab = builder.hflow("rsad_overview_content", "inset_frame_contain
       builder.hflow(nil, nil, {vertical_align = "center"}){
         builder.label({"rsad-controller-gui.yard-list"}, nil, "heading_2_label"),
         builder.spacer(false, true),
-        builder.button(ref_names.yard_create, controller_handlers.open_create_yard, "map_view_add_button", {"rsad-controller-gui.yard-create"}, nil, nil),
+        builder.button(ref_names.yard_create, controller_handlers.open_create_yard, "map_view_add_button", {"rsad-controller-gui.create"}, nil, nil),
       }
     },
     builder.list(ref_names.yard_list, nil, 0, "rsad_list_box", {vertically_stretchable = true}),

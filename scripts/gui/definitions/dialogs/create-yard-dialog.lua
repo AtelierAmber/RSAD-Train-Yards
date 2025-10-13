@@ -16,7 +16,7 @@ local dialog = builder.frame("rsad-controller-gui.dialog.create-yard", nil, true
       builder.label({"rsad-controller-gui.dialog.create-yard-name-field"}),
       builder.spacer(false, true),
       builder.text_field("create_yard_name", nil, nil, nil, nil, nil, true, true, "invalid_value_textfield", nil, {tooltip = {"rsad-controller-gui.dialog.invalid-name"}})
-      :with_events({_text_changed = handlers.on_name_updated})
+      :with_events({_text_changed = handlers.on_yard_name_updated})
     }
   },
   builder.hflow(){

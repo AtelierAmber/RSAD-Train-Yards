@@ -15,10 +15,12 @@ local pairs = pairs
 ---@class RSAD
 ---@field public stops table<uint, RSAD.Station>
 ---@field public yards table<string, RSAD.TrainYard>
+---@field public procedures table<string, RSAD.Procedure>
 ---@field public scheduler RSAD.Scheduler
 rsad = {
   stops = nil, --[[@type table<uint, RSAD.Station>]]
   yards = nil, --[[@type table<string, RSAD.TrainYard>]]
+  procedures = nil, --[[@type table<string, RSAD.Procedure>]]
   scheduler = scheduler, --[[@type RSAD.Scheduler]]
   shunter_networks = {}, --[[@type table<integer, string>]]           -- Train ID to TrainYard network hash
   station_assignments = {}, --[[@type table<integer, RSAD.Station>]]   -- Train ID to station it is parked at
@@ -31,6 +33,7 @@ rsad = {
 function rsad.on_init()
   if not storage.stops then storage.stops = {} end
   if not storage.yards then storage.yards = {} end
+  if not storage.procedures then storage.procedures = {} end
 
   rsad:setup()
 end
@@ -46,20 +49,15 @@ end
 function rsad.setup(self)
   self.stops = storage.stops
   self.yards = storage.yards
+  self.procedures = storage.procedures
   --storage.needs_tick = storage.needs_tick or false
 
-  if not self.stops or not self.yards then return end
+  if not self.stops or not self.yards or not self.procedures then return end
 
   for _, stop in pairs(self.stops) do
-    if stop.parked_train then
-      -- self.station_assignments[stop.parked_train] = stop
-    end
   end
 
   for network, yard in pairs(storage.yards) do
-    for id, info in pairs(yard.shunter_trains) do
-      -- self.shunter_networks[id] = network
-    end
   end
 end
 
@@ -78,6 +76,18 @@ function rsad.create_train_yard(self, name)
   }
 
   return self.yards[name]
+end
+
+function rsad.create_procedure(self, name)
+  if self.procedures[name] then
+    return nil
+  end
+  self.procedures[name] = {
+    name = name,
+    action_steps = {}
+  }
+
+  return self.procedures[name]
 end
 
 if true then

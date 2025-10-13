@@ -12,7 +12,10 @@ rsad.gui.ref_names = {
 }
 
 ---@class RSAD.Gui.PlayerState
+---@field index uint32
 ---@field active_yard string?
+---@field active_procedure string?
+---@field active_routine string?
 ---@field open_dialog string?
 
 rsad.gui.states = {} --[[@type table<uint, RSAD.Gui.PlayerState>]]

@@ -3,6 +3,7 @@
 ---@field public scripted_trains table<uint, ScriptedTrainDestination>
 ---@field public stops table<uint, RSAD.Station>
 ---@field public yards table<string, RSAD.TrainYard>
+---@field public procedures table<string, RSAD.Procedure>
 ---@field public gui_states table<uint, RSAD.Gui.PlayerState>
 storage = {}
 

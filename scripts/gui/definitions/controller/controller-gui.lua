@@ -6,8 +6,11 @@ local ref_names = rsad.gui.ref_names
 
 ---@type RSAD.Gui.PlayerState
 local default_gui_state = {
+  index = -1,
   active_yard = nil,
-  open_dialog = nil
+  active_procedure = nil,
+  active_routine = nil,
+  open_dialog = nil,
 }
 
 rsad.gui.controller_size = {1616, 820}
@@ -28,6 +31,7 @@ local function rsad_gui_construct(self, event, refs)
   if not state then 
     rsad.gui.states[event.player_index] = core_util.table.deepcopy(default_gui_state)
     state = rsad.gui.states[event.player_index]
+    state.index = event.player_index
   end
   rsad.gui.controller_refs = refs
   
@@ -35,10 +39,13 @@ local function rsad_gui_construct(self, event, refs)
 end
 
 ---Updates currently shown information on controller gui
----@param self LuaGuiElement
 ---@param player_state RSAD.Gui.PlayerState
-local function rsad_gui_update(self, player_state)
-  if rsad.yards and rsad.gui.controller_refs then
+local function rsad_gui_update(player_state)
+  if not rsad.gui.controller_refs then return nil end
+  if rsad.gui.controller_refs[rsad.gui.ref_names.main].elem.player_index ~= player_state.index then return end 
+
+  if rsad.yards then
+    -- Update Yard references
     local overview_yard_list = rsad.gui.controller_refs[rsad.gui.overview_tab.ref_names.yard_list]
     local logistics_yard_list = rsad.gui.controller_refs[rsad.gui.logistics_tab.ref_names.yard_list]
     if overview_yard_list or logistics_yard_list then
@@ -56,15 +63,39 @@ local function rsad_gui_update(self, player_state)
       if overview_yard_list then
         overview_yard_list.items = yard_names
         overview_yard_list.selected_index = selected_yard_i
-        for _, item in pairs(overview_yard_list.children) do
-          glib.add(item, builder.button("delete_item_button", handlers.delete_item, "tool_button_red", nil, nil, "utility.trash"))
-        end
       end
       if logistics_yard_list then
         logistics_yard_list.items = yard_names
         logistics_yard_list.selected_index = selected_yard_i
       end
     end
+  end
+  if rsad.procedures then
+    local procedures_list = rsad.gui.controller_refs[rsad.gui.procedures_tab.ref_names.procedures_list]
+    if procedures_list then
+      --- Find named procedure or 0
+      local selected_yard_i = 0
+      local i = 0
+      local procedure_names = {}
+      for _, procedure in pairs(rsad.procedures) do
+        i = i+1
+        if procedure.name == player_state.active_procedure then
+          selected_yard_i = i
+        end
+        procedure_names[i] = procedure.name
+      end
+      procedures_list.items = procedure_names
+      procedures_list.selected_index = selected_yard_i
+    end
+  end
+end
+
+---Updates the gui of all players
+---@param self LuaGuiElement
+local function rsad_update_all_player_states(self)
+  local players = game.connected_players
+  for _, player in pairs(players) do
+    rsad_gui_update(rsad.gui.states[player.index])
   end
 end
 
@@ -73,7 +104,7 @@ end
 local main_frame = 
 builder.frame(ref_names.main, "frame", true, {size = rsad.gui.controller_size})
   :center()
-  :with_class(ref_names.main, {construct = rsad_gui_construct, update = rsad_gui_update})
+  :with_class(ref_names.main, {construct = rsad_gui_construct, update = rsad_update_all_player_states})
   :with_events({_closed = handlers.close_controller}) {
   builder.hflow(){
     builder.label({"rsad-controller-gui.frame-title"}, nil, "frame_title"),
