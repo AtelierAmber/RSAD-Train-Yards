@@ -1,6 +1,7 @@
 local builder = require("scripts.gui.lib.gui-builder")
 local node_handlers = require("scripts.gui.handlers.procedure-node-handlers")
 local create_procedure_dialog = require("scripts.gui.definitions.dialogs.create-procedure-dialog")
+local core_util = require("util")
 
 local handlers = {}
 
@@ -23,10 +24,22 @@ end
 ---Add node to currently active procedure
 ---@param event EventData.on_gui_click
 function handlers.add_node(event)
-  local nodes = rsad.gui.controller_refs["procedure_nodes"]
-  local node = procedure_builder.build_node("test1", builder.label("Test"), builder.checkbox("check", true))
-  local arr_elem, arr_ref = glib.add(nodes, procedure_builder.arrow)
-  local node_elem, node_ref = glib.add(nodes, node)
+  --- Backend
+  local player_state = rsad.gui.states[event.player_index]
+  local active_procedure = player_state.active_procedure
+  if not active_procedure then return end
+  local steps = rsad.procedures[active_procedure].action_steps
+  if not steps then steps = {} end
+  table.insert(steps, core_util.table.deepcopy(rsad.builtin_actions[BuiltInAction.move]))
+
+  --- Gui stuff
+  local procedures_tab = rsad.gui.controller_refs[rsad.gui.procedures_tab.ref_names.main]
+  if procedures_tab.construct_node_graph then 
+    local added_nodes = procedures_tab:construct_node_graph(player_state)
+    if #added_nodes > 0 then
+      --local new_node = 
+    end
+  end
 end
 
 ---Set active procedure when selected from list

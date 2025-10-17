@@ -2,6 +2,7 @@
 
 g_builder_func_names = g_builder_func_names or {} --[[@type table<fun(event: GuiEventData), string>]]
 g_builder_handlers = g_builder_handlers or {} --[[@type table<string, fun(event: GuiEventData)>]]
+g_builder_classes = g_builder_classes or {} --[[@type table<string, table<string, fun(...):any>>]]
 
 ---@class RSAD.GuiBuilder : GuiElemDef
 ---@field center? fun(self:RSAD.GuiBuilder):RSAD.GuiBuilder
@@ -533,7 +534,68 @@ function builder.text_field(name, initial, numeric, decimal, negative, password,
       lose_focus_on_confirm = lose_focus,
       icon_selector = icon,
     },
-    style_mods = stylemods
+    style_mods = stylemods,
+    elem_mods = emods
+  }
+  local self = builder.make(def)
+  return self
+end
+
+---Creates a text box
+---@param name string?
+---@param initial string?
+---@param icon boolean?
+---@param style string?
+---@param stylemods StyleMods?
+---@param emods ElemMods?
+---@return RSAD.GuiBuilder
+function builder.text_box(name, initial, icon, style, stylemods, emods)
+  ---@type RSAD.GuiBuilder
+  local def = {
+    --[[@type LuaGuiElement.add_param.text_box]]
+    args = {
+      type = "textfield",
+      name = name,
+      style = style,
+      text = initial,
+      icon_selector = icon,
+    },
+    style_mods = stylemods,
+    elem_mods = emods
+  }
+  local self = builder.make(def)
+  return self
+end
+
+---Creates a number field
+---@param name string?
+---@param initial double?
+---@param min double?
+---@param max double?
+---@param step double?
+---@param discrete boolean?
+---@param style string?
+---@param stylemods StyleMods?
+---@param emods ElemMods?
+---@return RSAD.GuiBuilder
+function builder.slider(name, initial, min, max, step, discrete, style, stylemods, emods)
+  ---@type RSAD.GuiBuilder
+  local def = {
+    --[[@type LuaGuiElement.add_param.slider]]
+    args = {
+      type = "slider",
+      name = name,
+      value = initial,
+      value_step = step,
+      discrete_values = discrete,
+      minimum_value = min,
+      maximum_value = max,
+      style = style,
+      text = initial,
+      icon_selector = icon,
+    },
+    style_mods = stylemods,
+    elem_mods = emods
   }
   local self = builder.make(def)
   return self
@@ -579,7 +641,9 @@ function builder:with_class(name, class_funcs)
     return self
   end
 
-  glib.register_class(name, class_funcs)
+  if not g_builder_classes[name] then
+    glib.register_class(name, class_funcs)
+  end
   self.class = name
 
   return self
