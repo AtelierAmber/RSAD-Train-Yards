@@ -18,7 +18,7 @@ local routines_tab = builder.hflow(ref_names.main, "inset_frame_container_horizo
         builder.button("create_routine", nil, "map_view_add_button", {"rsad-controller-gui.create"}),
       }
     },
-    builder.list("rsad_routines_list", nil, 0, "rsad_list_box", {vertically_stretchable = true}),
+    builder.list("rsad_routines_list", nil, nil, 0, "rsad_list_box", {vertically_stretchable = true}),
   },
   builder.hscroll(nil, "always", "rsad_procedure_array", {width = 1136 + (420 - 300), horizontally_stretchable = true, horizontally_squashable = false}){
     builder.hflow("routine_nodes", nil, {padding = 20, vertically_stretchable = true, horizontally_stretchable = true, vertical_align = "center"})

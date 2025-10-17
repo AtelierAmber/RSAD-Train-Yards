@@ -20,7 +20,7 @@ local overview_tab = builder.hflow("rsad_overview_content", "inset_frame_contain
         builder.button(ref_names.yard_create, controller_handlers.open_create_yard, "map_view_add_button", {"rsad-controller-gui.create"}, nil, nil),
       }
     },
-    builder.list(ref_names.yard_list, nil, 0, "rsad_list_box", {vertically_stretchable = true}),
+    builder.list(ref_names.yard_list, nil, nil, 0, "rsad_list_box", {vertically_stretchable = true}),
   },
   builder.vscroll(nil, nil, "trains_scroll_pane"){
     builder.table(4, "rsad_overview_train_views", "trains_widget_table", nil, nil, 

@@ -8,6 +8,7 @@ local handlers = {}
 ---comment
 ---@param event GuiEventData
 function handlers.open_create_procedure(event)
+  --TODO Fix crash when procedure dialog is already open
   local player = game.get_player(event.player_index)
   if not player then error("No player found when opening create procedure dialog!") end
 
@@ -19,6 +20,7 @@ function handlers.open_create_procedure(event)
   end
 
   player.opened = elem
+  refs["create_procedure_name"].focus()
 end
 
 ---Add node to currently active procedure

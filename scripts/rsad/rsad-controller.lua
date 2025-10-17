@@ -12,30 +12,30 @@ local pairs = pairs
 
 --#endregion
 
----@class RSAD
----@field public stops table<uint, RSAD.Station>
----@field public yards table<string, RSAD.TrainYard>
----@field public procedures table<string, RSAD.Procedure>
----@field public scheduler RSAD.Scheduler
-rsad = {
-  stops = nil, --[[@type table<uint, RSAD.Station>]]
-  yards = nil, --[[@type table<string, RSAD.TrainYard>]]
-  procedures = nil, --[[@type table<string, RSAD.Procedure>]]
-  scheduler = scheduler, --[[@type RSAD.Scheduler]]
-  shunter_networks = {}, --[[@type table<integer, string>]]           -- Train ID to TrainYard network hash
-  station_assignments = {}, --[[@type table<integer, RSAD.Station>]]   -- Train ID to station it is parked at
-  
-  events = {}, --[[@type table<defines.events, fun(event:EventData)>]]
-}
 
 --rsad_controller.scheduler.controller = rsad_controller
+
+local function setup()
+  rsad.stops = storage.stops
+  rsad.yards = storage.yards
+  rsad.procedures = storage.procedures
+  --storage.needs_tick = storage.needs_tick or false
+
+  if not rsad.stops or not rsad.yards or not rsad.procedures then return end
+
+  for _, stop in pairs(rsad.stops) do
+  end
+
+  for network, yard in pairs(storage.yards) do
+  end
+end
 
 function rsad.on_init()
   if not storage.stops then storage.stops = {} end
   if not storage.yards then storage.yards = {} end
   if not storage.procedures then storage.procedures = {} end
 
-  rsad:setup()
+  setup()
 end
 
 function rsad.on_configuration_changed()
@@ -43,23 +43,9 @@ function rsad.on_configuration_changed()
 end
 
 function rsad.on_load()
-  rsad:setup()
+  setup()
 end
 
-function rsad.setup(self)
-  self.stops = storage.stops
-  self.yards = storage.yards
-  self.procedures = storage.procedures
-  --storage.needs_tick = storage.needs_tick or false
-
-  if not self.stops or not self.yards or not self.procedures then return end
-
-  for _, stop in pairs(self.stops) do
-  end
-
-  for network, yard in pairs(storage.yards) do
-  end
-end
 
 ---Creates a blank train yard and adds it to the registerd yards
 ---@param self RSAD

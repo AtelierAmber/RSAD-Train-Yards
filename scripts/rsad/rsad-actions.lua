@@ -50,14 +50,14 @@ rsad.builtin_actions[BuiltInAction.move] = {
   params = {
     move_type = MoveType.move_by_wagon.name,
     distance = 1,
-    direction = {runtime = true, variable = RuntimeParamType.train.arrival_rear}
+    direction = {runtime = true, variable = RuntimeParamType.train.arrival_rear_dir}
   }
 }
 rsad.builtin_actions[BuiltInAction.couple] = {
   internal_type = BuiltInAction.couple,
   call = "couple_to",
   params = {
-    direction = {runtime = true, variable = RuntimeParamType.train.arrival_front}
+    direction = {runtime = true, variable = RuntimeParamType.train.arrival_front_dir}
   }
 }
 rsad.builtin_actions[BuiltInAction.decouple] = {
@@ -66,7 +66,7 @@ rsad.builtin_actions[BuiltInAction.decouple] = {
   params = {
     track_from = {runtime = true, variable = RuntimeParamType.train.rear_locomotive},
     offset = 0,
-    direction = {runtime = true, variable = RuntimeParamType.train.arrival_front}
+    direction = {runtime = true, variable = RuntimeParamType.train.arrival_front_dir}
   }
 }
 rsad.builtin_actions[BuiltInAction.decouple_all_cargo] = {
@@ -75,7 +75,7 @@ rsad.builtin_actions[BuiltInAction.decouple_all_cargo] = {
   params = {
     track_from = {runtime = true, variable = RuntimeParamType.train.rear_locomotive},
     offset = 0,
-    direction = {runtime = true, variable = RuntimeParamType.train.arrival_front}
+    direction = {runtime = true, variable = RuntimeParamType.train.arrival_front_dir}
   }
 }
 

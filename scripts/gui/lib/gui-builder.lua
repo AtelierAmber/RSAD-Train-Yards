@@ -6,7 +6,7 @@ g_builder_classes = g_builder_classes or {} --[[@type table<string, table<string
 
 ---@class RSAD.GuiBuilder : GuiElemDef
 ---@field center? fun(self:RSAD.GuiBuilder):RSAD.GuiBuilder
----@field with_class? fun(self:RSAD.GuiBuilder, name:string, class_funcs:table<string, fun(...):any>):RSAD.GuiBuilder
+---@field with_class? fun(self:RSAD.GuiBuilder, name:string, class_funcs:table<string, fun(...):any>?):RSAD.GuiBuilder
 local builder = {}
 local builder_meta = {
   ---Use {} from a return function of builder to initialize children
@@ -633,16 +633,17 @@ end
 ---Registers a constructor that can be called after add
 ---@param self RSAD.GuiBuilder
 ---@param name string
----@param class_funcs table<string, fun(...):any>
+---@param class_funcs table<string, fun(...):any>?
 ---@return RSAD.GuiBuilder
 function builder:with_class(name, class_funcs)
   if self.class then
     error("Trying to register GUIBuilder class to a gui twice!")
-    return self
   end
 
   if not g_builder_classes[name] then
+    if not class_funcs then error("Class with name " .. name .. " not yet registered before nil call!") end
     glib.register_class(name, class_funcs)
+    g_builder_classes[name] = class_funcs
   end
   self.class = name
 
@@ -668,9 +669,6 @@ function builder:with_events(events)
   return self
 end
 
----@class RSAD.GuiBuilderMeta.Index
----@field center fun(self:RSAD.GuiBuilder)
----@field with_construction fun(self:RSAD.GuiBuilder, name:string, constructor:fun(self:LuaGuiElement, ...))
 builder_meta.__index = {
   center = builder.center,
   with_class = builder.with_class,

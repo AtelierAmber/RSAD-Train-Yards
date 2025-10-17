@@ -83,6 +83,50 @@ styles.rsad_array_frame = {
   }
 }
 
+--- Text Box
+styles.rsad_editable_label = {
+  type = "textbox_style",
+  ignored_by_search = false,
+  default_background =
+  {
+    base = {position = {282, 0}, corner_size = 8},
+    opacity = 0.5
+  },
+  font_color = gui_color.caption,
+  left_padding = 8,
+  right_padding = 2,
+  top_padding = 0,
+  bottom_padding = 0,
+  width = 180,
+  minimal_width = 0,
+  horizontally_stretchable = "on",
+
+  disabled_font_color = util.premul_color {1, 1, 1, 0.5},
+  game_controller_hovered_background =
+  {
+    base = {position = {265, 0}, corner_size = 8},
+    shadow = default_inner_shadow
+  },
+  disabled_background =
+  {
+    base = {position = {282, 0}, corner_size = 8},
+    shadow = textbox_dirt
+  },
+  active_background = 
+  {
+    base = {position = {282, 0}, corner_size = 8},
+    shadow = textbox_dirt
+  },
+  selection_background_color= {141, 90, 100},
+  rich_text_setting = "enabled",
+  rich_text_highlight_error_color = {166, 10, 10},
+  rich_text_highlight_warning_color = {255, 90, 0},
+  rich_text_highlight_ok_color = {63, 105, 0},
+  selected_rich_text_highlight_error_color = {166, 10, 10},
+  selected_rich_text_highlight_warning_color = {182, 62, 4},
+  selected_rich_text_highlight_ok_color = {50, 80, 0}
+}
+
 --- Unused
 styles.rsad_procedure_array = {
   type = "scroll_pane_style",

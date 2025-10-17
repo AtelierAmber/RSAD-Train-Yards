@@ -1,6 +1,6 @@
 flib = require("__flib__.data-util")
 
-require("prototypes.styles")
+require("prototypes.rsad-styles")
 require("prototypes.names")
 require("prototypes.rsad-input")
 require("prototypes.rsad-items")
